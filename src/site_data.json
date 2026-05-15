@@ -1,0 +1,65 @@
+{
+  "levels": [
+    {
+      "id": "primary",
+      "name": "التعليم الابتدائي",
+      "color": "border-emerald-500 text-emerald-700",
+      "years": [
+        { "id": "prep", "label": "السنة التحضيرية ابتدائي" },
+        { "id": "1ap", "label": "السنة الأولى ابتدائي" },
+        { "id": "2ap", "label": "السنة الثانية ابتدائي" },
+        { "id": "3ap", "label": "السنة الثالثة ابتدائي" },
+        { "id": "4ap", "label": "السنة الرابعة ابتدائي" },
+        { "id": "5ap", "label": "السنة الخامسة ابتدائي" }
+      ]
+    },
+    {
+      "id": "middle",
+      "name": "التعليم المتوسط",
+      "color": "border-blue-500 text-blue-700",
+      "years": [
+        { "id": "1am", "label": "السنة الأولى متوسط" },
+        { "id": "2am", "label": "السنة الثانية متوسط" },
+        { "id": "3am", "label": "السنة الثالثة متوسط" },
+        { "id": "4am", "label": "السنة الرابعة متوسط" }
+      ]
+    },
+    {
+      "id": "secondary",
+      "name": "التعليم الثانوي",
+      "color": "border-amber-500 text-amber-700",
+      "years": [
+        { "id": "1as", "label": "السنة الأولى ثانوي" },
+        { "id": "2as", "label": "السنة الثانية ثانوي" },
+        { "id": "3as", "label": "السنة الثالثة ثانوي" }
+      ]
+    }
+  ],
+  "subjects": [
+    { "id": "math", "arabicName": "الرياضيات", "icon": "Calculator", "levels": ["primary", "middle", "secondary"] },
+    { "id": "arabic", "arabicName": "اللغة العربية", "icon": "BookOpen", "levels": ["primary", "middle", "secondary"] },
+    { "id": "physics", "arabicName": "العلوم الفيزيائية", "icon": "Atom", "levels": ["middle", "secondary"] },
+    { "id": "science", "arabicName": "علوم الطبيعة و الحياة", "icon": "Microscope", "levels": ["middle", "secondary"] },
+    { "id": "history_geo", "arabicName": "التاريخ والجغرافيا", "icon": "Globe", "levels": ["middle", "secondary"] },
+    { "id": "islamic", "arabicName": "العلوم الإسلامية", "icon": "Moon", "levels": ["primary", "middle", "secondary"] },
+    { "id": "philosophy", "arabicName": "الفلسفة", "icon": "Lightbulb", "levels": ["secondary"] },
+    { "id": "french", "arabicName": "اللغة الفرنسية", "icon": "Languages", "levels": ["primary", "middle", "secondary"] },
+    { "id": "english", "arabicName": "اللغة الانجليزية", "icon": "Languages", "levels": ["primary", "middle", "secondary"] },
+    { "id": "informatics", "arabicName": "الإعلام الآلي", "icon": "Cpu", "levels": ["middle", "secondary"] },
+    { "id": "technology", "arabicName": "التكنولوجيا", "icon": "Cpu", "levels": ["secondary", "middle"] },
+    { "id": "accounting", "arabicName": "التسيير المحاسبي والمالي", "icon": "Calculator", "levels": ["secondary"] },
+    { "id": "law", "arabicName": "القانون", "icon": "Landmark", "levels": ["secondary"] },
+    { "id": "economy", "arabicName": "الاقتصاد والمناجمنت", "icon": "Palmtree", "levels": ["secondary"] },
+    { "id": "civic", "arabicName": "التربية المدنية", "icon": "Landmark", "levels": ["primary", "middle"] },
+    { "id": "primary_science", "arabicName": "التربية العلمية والتكنولوجية", "icon": "Lightbulb", "levels": ["primary"] },
+    { "id": "amazigh", "arabicName": "اللغة الأمازيغية", "icon": "Sparkles", "levels": ["primary", "middle", "secondary"] },
+    { "id": "art", "arabicName": "التربية الفنية", "icon": "Palette", "levels": ["primary", "middle"] },
+    { "id": "music", "arabicName": "التربية الموسيقية", "icon": "Music", "levels": ["primary", "middle"] },
+    { "id": "documents", "arabicName": "مستندات تعليمية", "icon": "Library", "levels": ["primary", "middle", "secondary"] }
+  ],
+  "nationalExams": [
+    { "id": "cinq", "label": "شهادة التعليم الابتدائي (Cinquième)", "year": "5ap" },
+    { "id": "bem", "label": "شهادة التعليم المتوسط (BEM)", "year": "4am" },
+    { "id": "bac", "label": "شهادة البكالوريا (BAC)", "year": "3as" }
+  ]
+}

@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@1,400;1,700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Cairo", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  
+  --color-brand-primary: var(--primary-dark, #1B2B24); 
+  --color-brand-accent: var(--accent, #D4AF37);  
+  --color-brand-bg: var(--bg-light, #f0fdf4);      
+  
+  /* New DzExams inspired colors */
+  --color-dz-green: #059669;
+  --color-dz-green-dark: #064e3b;
+  --color-dz-gold: #D4AF37;
+  --color-dz-gold-dark: #b8860b;
+  --color-dz-dark: #022c22;
+  --color-dz-card: var(--card-bg, #ffffff);
+  --color-dz-bg: var(--bg-main, #ecfdf5);
+
+  --color-dark-bg: var(--bg-dark, #020617);
+  --color-dark-card: var(--card-dark, #0f172a);
+  --color-dark-border: var(--border-dark, #1e293b);
+  --color-dark-text: var(--text-dark, #f8fafc);
+  
+  --color-nocturne-bg: #050b1a;
+  --color-nocturne-card: #0a1128;
+  --color-nocturne-accent: #fbbf24;
+}
+
+:root {
+  --primary: #059669;
+  --primary-dark: #064e3b;
+  --accent: #D4AF37;
+  --accent-light: #F97316;
+  --bg-main: #ecfdf5;
+  --text-base: #022c22;
+  --card-bg: #ffffff;
+}
+
+[data-theme='blue'] {
+  --primary: #2563eb;
+  --primary-dark: #1e3a8a;
+  --accent: #f59e0b;
+  --accent-light: #fbbf24;
+  --bg-main: #eff6ff;
+  --text-base: #1e3a8a;
+  --card-bg: #ffffff;
+}
+
+[data-theme='purple'] {
+  --primary: #7c3aed;
+  --primary-dark: #4c1d95;
+  --accent: #f472b6;
+  --accent-light: #ec4899;
+  --bg-main: #f5f3ff;
+  --text-base: #4c1d95;
+  --card-bg: #ffffff;
+}
+
+[data-theme='red'] {
+  --primary: #dc2626;
+  --primary-dark: #7f1d1d;
+  --accent: #fbbf24;
+  --accent-light: #f59e0b;
+  --bg-main: #fef2f2;
+  --text-base: #7f1d1d;
+  --card-bg: #ffffff;
+}
+
+[data-theme='nocturne'] {
+  --primary: #3b82f6;
+  --primary-dark: #1e40af;
+  --accent: #fbbf24;
+  --accent-light: #fcd34d;
+  --bg-main: #020617;
+  --text-base: #f8fafc;
+  --card-bg: #0f172a;
+}
+
+@utility gold-3d {
+  box-shadow: 
+    0 0 0 2px #d4af37,
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+@utility glass-crystal {
+  @apply backdrop-blur-md bg-white/70 border-b border-dz-gold/30 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+}
+
+.dark .glass-crystal {
+  @apply bg-slate-900/70 border-dz-gold/20 shadow-[0_8px_32px_0_rgba(0,0,0,0.4)];
+}
+
+body {
+  @apply bg-dz-bg text-dz-dark antialiased transition-colors duration-300;
+}
+
+body.dark {
+  @apply bg-dark-bg text-dark-text;
+}

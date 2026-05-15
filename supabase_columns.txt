@@ -1,0 +1,26 @@
+Structure de la Table Supabase: lienspdfs2 (Dernière Version)
+
+Colonnes (Nom Technique | Description):
+--------------------------------------------------
+1. id               | Identifiant unique (UUID)
+2. cycle            | Cycle d'enseignement (ex: primaire, moyen, secondaire)
+3. annee            | Niveau scolaire (ex: 1am, 4am, 3as)
+4. matiere          | Le sujet réel (ex: anglais, arabe, maths)
+5. Trimesttre       | Information du trimestre (ex: trimestre-1) - Note: double 't'
+6. nom_pdf          | Le nom réel du fichier PDF
+7. chemin_complet   | Dossier source sur Google Drive
+8. lien_direct      | URL de téléchargement Google Drive
+9. created_at      | Horodatage d'insertion
+
+Résumé Statistiques (Grouping):
+--------------------------------------------------
+L'application génère un tableau de bord résumé par :
+- Cycle
+- Niveau (Année)
+- Matière
+- Trimestre (Déduit du champ Trimesttre + Chemin + Nom PDF)
+
+Synchronisation :
+- Les données sont synchronisées en temps réel.
+- Le backend utilise des helpers partagés pour extraire proprement les trimestres (F1, F2, F3) même quand le champ est brut.
+- Plus de 9900 enregistrements sont gérés de manière performante.
