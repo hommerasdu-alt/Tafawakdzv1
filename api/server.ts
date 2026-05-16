@@ -142,6 +142,10 @@ function extractTrimestreLabel(row: any) {
   const fileName = row.nom_pdf || '';
   const text = `${val} ${path} ${fileName} ${row.matiere || ''}`.toLowerCase();
   
+  if (text.includes('docs') || text.includes('document') || text.includes('مستندات') || text.includes('وثائق') || text.includes('ملخص') || text.includes('ملخصات')) {
+    return 'document';
+  }
+
   if (text.includes('3eme trimestre') || text.includes('3ème trimestre') || text.includes('trimestre 3') || text.includes('trimestre-3') || path.includes('/t3/') || path.includes('/f3/') || path.includes('/trimestre-3/') || text.includes('ثالث') || text.includes('الفصل 3') || text.includes('الفصل الثالث') || /\b(t3|f3|3eme|3ème)\b/.test(text)) {
     return 'trimestre-3';
   }

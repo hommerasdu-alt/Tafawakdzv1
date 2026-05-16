@@ -10,6 +10,7 @@ import {
   Palmtree, 
   Search,
   User,
+  Users,
   GraduationCap,
   ChevronLeft,
   ChevronRight,
@@ -62,6 +63,7 @@ import PdfList from './components/PdfList';
 import GradeCalculator from './components/GradeCalculator';
 import AiTutor from './components/AiTutor';
 import DatabaseDashboard from './components/DatabaseDashboard';
+import TeacherSpace from './components/TeacherSpace';
 
 interface Subject {
   id: string;
@@ -124,6 +126,7 @@ export default function App() {
   const [activeNav, setActiveNav] = React.useState<string | null>(null);
   const [statsData, setStatsData] = React.useState<any[]>([]);
   const [isDbDashboardOpen, setIsDbDashboardOpen] = React.useState(false);
+  const [isTeacherSpaceOpen, setIsTeacherSpaceOpen] = React.useState(false);
   const [homeFilesPage, setHomeFilesPage] = React.useState(1);
   const ITEMS_PER_PAGE_HOME = 20;
 
@@ -448,6 +451,14 @@ export default function App() {
 
           <nav className="hidden lg:flex items-center gap-6 text-[11px] uppercase tracking-widest font-black text-dz-dark dark:text-emerald-50">
             <button onClick={() => setSelectedYear(null)} className={`${!selectedYear ? 'text-dz-green border-b-2 border-dz-green' : ''} px-2 pb-1 hover:text-dz-green transition-all cursor-pointer`}>الرئيسية</button>
+            
+            <button 
+              onClick={() => setIsTeacherSpaceOpen(true)}
+              className="px-2 pb-1 hover:text-dz-green transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <Users size={14} className="text-dz-gold" />
+              <span>فضاء الأستاذ</span>
+            </button>
             
             {levels.map(level => (
               <div 
@@ -923,23 +934,12 @@ export default function App() {
               {/* Breadcrumbs */}
               <nav className="flex items-center gap-2 text-[10px] font-black text-dz-green-dark dark:text-emerald-300/60 mb-2 px-2 overflow-x-auto whitespace-nowrap">
                 <button onClick={() => setSelectedYear(null)} className="hover:text-dz-green transition-colors flex items-center gap-1">الرئيسية <ChevronLeft size={12} /></button>
-                <span className="flex items-center gap-1">{getYearLabel(selectedYear)} {selectedSubjectId && <ChevronLeft size={12} />}</span>
-                {selectedSubjectId && (
-                  <span className="text-dz-green">{subjects.find(s => s.id === selectedSubjectId)?.arabicName}</span>
-                )}
               </nav>
 
               {!selectedSubjectId ? (
                 <>
                   <div className="bg-dz-green py-10 px-8 text-center text-white gold-3d relative overflow-hidden rounded-2xl shadow-xl border-2 border-dz-gold/20 mb-6">
-                    {/* Background image hidden as requested */}
-                    {/* <div 
-                      className="absolute inset-0 z-0 opacity-40 bg-cover bg-center" 
-                      style={{ backgroundImage: currentLevelId ? `url(${levelImages[currentLevelId]})` : 'none' }}
-                    ></div> */}
                     <div className="absolute inset-0 bg-gradient-to-t from-dz-green/95 via-dz-green/50 to-transparent z-10"></div>
-                    <h3 className="text-[clamp(16px,3vw,24px)] sm:text-4xl font-black relative z-20 drop-shadow-lg">{getYearLabel(selectedYear)}</h3>
-                    <p className="text-[clamp(9px,1.8vw,14px)] sm:text-base font-black text-emerald-100 mt-2 relative z-20 drop-shadow-md">جميع الفروض والاختبارات لمستوى {getYearLabel(selectedYear)}</p>
                   </div>
                   
                   <div className="bg-dz-green-dark p-4 text-center text-emerald-100 text-xs italic rounded-xl border-2 border-dz-gold shadow-lg mt-4 mb-2">
@@ -956,7 +956,6 @@ export default function App() {
                       >
                         <div className="w-12 flex flex-col items-center justify-center border-l dark:border-dz-gold border-dz-gold bg-dz-bg dark:bg-dz-green-dark/30 group-hover:bg-dz-green transition-colors">
                           <span className="text-dz-green dark:text-dz-gold font-black text-[clamp(9px,2vw,11px)] group-hover:text-white transition-colors">{getSubjectFileCount(subj.id)}</span>
-                          <span className="text-[6px] font-black text-slate-400 group-hover:text-white/70 uppercase tracking-tighter">ملف</span>
                         </div>
                         <div className="flex-1 flex items-center justify-center px-4">
                           <span className="text-dz-dark dark:text-white font-black text-[clamp(10px,2.5vw,13px)] text-center group-hover:text-dz-green transition-colors leading-tight">{subj.arabicName}</span>
@@ -997,6 +996,7 @@ export default function App() {
                 <div className="flex flex-col gap-3">
                   {[
                     { label: 'بنك الفروض', icon: Library, action: () => setSelectedYear('1am') },
+                    { label: 'فضاء الأستاذ', icon: Users, action: () => setIsTeacherSpaceOpen(true) },
                     { label: 'الكتب المدرسية', icon: BookOpen, action: () => {} },
                     { label: 'حساب المعدل', icon: Calculator, action: () => setIsCalculatorOpen(true) },
                     { label: 'نتائج الامتحانات', icon: Award, action: () => {} }
@@ -1063,6 +1063,7 @@ export default function App() {
       <footer className="bg-dz-green-dark dark:bg-black border-t-2 border-dz-gold mt-20 text-white shadow-2xl relative">
         {/* Modals and Overlays */}
         <GradeCalculator isOpen={isCalculatorOpen} onClose={() => setIsCalculatorOpen(false)} />
+        <TeacherSpace isOpen={isTeacherSpaceOpen} onClose={() => setIsTeacherSpaceOpen(false)} />
         <AiTutor />
         
         {/* Search Modal */}

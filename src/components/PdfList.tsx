@@ -164,10 +164,6 @@ const CategoryItem: React.FC<CategoryItemProps> = ({
             <div className="flex items-center gap-2">
               <span className={`bg-black/20 text-white/70 text-[9px] font-black px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1 transition-all shrink-0 ${isOpen ? `bg-${sectionColor} text-white` : 'group-hover:bg-dz-gold group-hover:text-dz-green-dark'}`}>
                 <span>{count}</span>
-                <span className="text-[7px] opacity-70">ملف</span>
-              </span>
-              <span className={`text-[8px] font-black px-2 py-0.5 rounded-md border bg-dz-green/20 border-dz-green/30 text-dz-green ${!isOpen ? 'bg-white/10 text-white border-white/20' : ''}`}>
-                الفصل الدراسي
               </span>
             </div>
           </div>
@@ -182,39 +178,9 @@ const CategoryItem: React.FC<CategoryItemProps> = ({
           animate={{ height: "auto", opacity: 1 }}
           className={`bg-white dark:bg-dark-bg border-x-2 border-${sectionColor}/30 overflow-hidden`}
         >
-          {/* Detailed Statistics Header for Category */}
-          <div className={`px-4 py-3 bg-${sectionColor}/5 dark:bg-${sectionColor}/5 border-b border-${sectionColor}/20`}>
-             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-                <div className="flex flex-col items-center">
-                   <span className={`text-[7px] text-dz-green-dark/50 dark:text-${sectionColor}/50 font-black uppercase`}>المستوى</span>
-                   <span className="text-[9px] font-black text-dz-dark dark:text-white tracking-tighter">{getYearLabel(selectedYear)}</span>
-                </div>
-                <div className="flex flex-col items-center">
-                   <span className={`text-[7px] text-dz-green-dark/50 dark:text-${sectionColor}/50 font-black uppercase`}>المادة</span>
-                   <span className="text-[9px] font-black text-dz-dark dark:text-white truncate max-w-[80px]">{stats.subject}</span>
-                </div>
-                <div className="flex flex-col items-center">
-                   <span className={`text-[7px] text-dz-green-dark/50 dark:text-${sectionColor}/50 font-black uppercase`}>الفصل</span>
-                   <span className="text-[9px] font-black text-dz-dark dark:text-white">{stats.trimester}</span>
-                </div>
-                <div className="flex flex-col items-center">
-                   <span className={`text-[7px] text-dz-green-dark/50 dark:text-${sectionColor}/50 font-black uppercase`}>المحتوى</span>
-                   <span className={`text-[9px] font-black italic text-dz-green`}>
-                      فروض + إختبارات
-                   </span>
-                </div>
-                <div className="flex flex-col items-center">
-                   <span className={`text-[7px] text-dz-green-dark/50 dark:text-${sectionColor}/50 font-black uppercase`}>المتوفر</span>
-                   <span className={`text-[10px] font-black text-${sectionColor}`}>{count} ملف</span>
-                </div>
-             </div>
-          </div>
           <div className={`flex flex-col border-b border-${sectionColor}/20 bg-dz-bg dark:bg-dark-bg/50`}>
             <div className="flex items-center justify-center gap-2 p-3 pb-1.5 flex-wrap">
-              <span className="text-[10px] font-black text-dz-green-dark dark:text-emerald-100/70 flex items-center gap-2">
-                <FileText size={12} className="text-dz-gold" />
-                تصفية حسب:
-              </span>
+
               {[
                 { id: 'all', label: 'الكل' },
                 { id: 'devoir', label: 'فروض' },
@@ -226,26 +192,23 @@ const CategoryItem: React.FC<CategoryItemProps> = ({
                   onClick={(e) => { e.stopPropagation(); setFilterType(filter.id as any); setCurrentPage(1); }}
                   className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType === filter.id ? 'bg-dz-gold text-dz-green-dark shadow-md' : 'bg-white dark:bg-slate-800 border border-dz-gold/30 text-dz-dark dark:text-white hover:bg-dz-gold/10'}`}
                 >
-                  {filter.label}
                 </button>
               ))}
             </div>
             
             <div className="flex items-center justify-center gap-2 p-3 pt-1.5">
-              <span className="text-[10px] font-black text-dz-green-dark dark:text-emerald-100/70">ترتيب حسب:</span>
+
               <button 
                 onClick={(e) => { e.stopPropagation(); setSortBy('name'); }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${sortBy === 'name' ? 'bg-dz-green text-white gold-3d' : 'bg-white dark:bg-slate-800 border border-dz-gold/30 text-dz-dark dark:text-white hover:bg-emerald-50 dark:hover:bg-dz-green-dark/30'}`}
               >
                 <SortAsc size={12} />
-                الاسم
               </button>
               <button 
                 onClick={(e) => { e.stopPropagation(); setSortBy('year'); }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${sortBy === 'year' ? 'bg-dz-green text-white gold-3d' : 'bg-white dark:bg-slate-800 border border-dz-gold/30 text-dz-dark dark:text-white hover:bg-emerald-50 dark:hover:bg-dz-green-dark/30'}`}
               >
                 <CalendarDays size={12} />
-                السنة
               </button>
             </div>
           </div>
@@ -413,6 +376,14 @@ const PdfList: React.FC<PdfListProps> = ({
         let category = "فروض و إختبارات الفصل الأول";
         const textToSearch = `${trimesterVal} ${path} ${fileName}`.toLowerCase();
         
+        const isDoc = trimesterVal.includes('document') || 
+                      textToSearch.includes('docs') || 
+                      textToSearch.includes('document') || 
+                      textToSearch.includes('مستندات') || 
+                      textToSearch.includes('وثائق') || 
+                      textToSearch.includes('ملخص') || 
+                      textToSearch.includes('ملخصات');
+
         const isTrimester2 = trimesterVal.includes('2') || 
                              trimesterVal.includes('ثاني') || 
                              textToSearch.includes('trimestre-2') || 
@@ -431,19 +402,12 @@ const PdfList: React.FC<PdfListProps> = ({
                              path.includes('/trimestre-3/') || 
                              /\b(t3|f3|3eme|3ème)\b/.test(textToSearch);
         
-        const isDoc = textToSearch.includes('docs') || 
-                      textToSearch.includes('document') || 
-                      textToSearch.includes('مستندات') || 
-                      textToSearch.includes('وثائق') || 
-                      textToSearch.includes('ملخص') || 
-                      textToSearch.includes('ملخصات');
-
-        if (isTrimester2) {
+        if (isDoc) {
+          category = "مستندات تعليمية";
+        } else if (isTrimester2) {
           category = "فروض و إختبارات الفصل الثاني";
         } else if (isTrimester3) {
           category = "فروض و إختبارات الفصل الثالث";
-        } else if (isDoc) {
-          category = "مستندات تعليمية";
         } else {
           category = "فروض و إختبارات الفصل الأول";
         }
@@ -521,8 +485,6 @@ const PdfList: React.FC<PdfListProps> = ({
       <div className="flex flex-col gap-1 rounded-2xl overflow-hidden shadow-2xl border-2 border-dz-gold bg-white dark:bg-slate-900">
         <div className="bg-dz-green py-8 px-10 text-center text-white relative overflow-hidden">
           <div className="absolute top-0 left-0 w-32 h-32 bg-white/5 rounded-full -ml-16 -mt-16 blur-2xl"></div>
-          <h3 className="text-[clamp(10px,2vw,14px)] font-black text-dz-gold uppercase tracking-widest mb-2 opacity-80">{getYearLabel(selectedYear)}</h3>
-          <h2 className="text-[clamp(18px,4vw,30px)] font-black relative z-10">مادة {selectedSubject?.arabicName}</h2>
           <div className="mt-4 flex items-center justify-center gap-4 text-[10px] font-black">
              <span className="bg-white/20 px-3 py-1 rounded-full border border-white/10">فروض واختبارات</span>
              <span className="bg-white/20 px-3 py-1 rounded-full border border-white/10">دروس وملخصات</span>
