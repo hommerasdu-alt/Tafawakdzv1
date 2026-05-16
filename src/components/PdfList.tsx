@@ -382,7 +382,15 @@ const PdfList: React.FC<PdfListProps> = ({
       if (!response.ok) {
         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
       }
-      const data = await response.json();
+      
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error("Invalid JSON response:", text.substring(0, 200));
+        throw new Error("Erreur de configuration. Si vous êtes sur Vercel, vérifiez que l'API est déployée correctement.");
+      }
       
       const formatName = (f: any) => {
         const c = (f.cycle || f.Cycle || '').toLowerCase().replace(/\s+/g, '_');

@@ -2,12 +2,14 @@ import 'dotenv/config';
 import express from 'express';
 import sql from 'mssql';
 import cors from 'cors';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { parse } from 'csv-parse/sync';
 import { createClient } from '@supabase/supabase-js';
+
+// we'll load this dynamically only when needed (dev mode)
+// import { createServer as createViteServer } from 'vite';
 
 // Prevent crash on unhandled errors
 process.on('unhandledRejection', (reason, promise) => {
@@ -24,7 +26,7 @@ const __dirname = path.dirname(__filename);
 // Supabase Configuration
 // Default credentials (updated with user provided project)
 const DEFAULT_URL = 'https://ecjleikavlsiqyazbbvt.supabase.co';
-const DEFAULT_KEY = ''; // REMOVED FOR GITHUB EXPORT SECURITY - USE ENVIRONMENT VARIABLES
+const DEFAULT_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'votre_cle_secrete_ici'; // REMOVED FOR GITHUB EXPORT SECURITY
 
 // Environment variables priority
 const nextUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -132,20 +134,19 @@ function extractTrimestreLabel(row: any) {
   return 'Général';
 }
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+const app = express();
+const PORT = 3000;
 
-  app.use(cors());
-  app.use(express.json());
+app.use(cors());
+app.use(express.json());
 
-  // Logging middleware FIRST
-  app.use((req, res, next) => {
-    if (req.url.startsWith('/api')) {
-      console.log(`🚀 [API Request] ${req.method} ${req.url}`);
-    }
-    next();
-  });
+// Logging middleware FIRST
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api')) {
+    console.log(`🚀 [API Request] ${req.method} ${req.url}`);
+  }
+  next();
+});
 
   // Health check
   app.get('/api/health', (req, res) => {
@@ -769,31 +770,37 @@ async function startServer() {
     res.status(404).json({ error: `Route API non trouvée: ${req.method} ${req.url}` });
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== 'production') {
-    try {
-      console.log('📦 Initializing Vite middleware...');
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: 'spa',
+export default app;
+
+if (!process.env.VERCEL) {
+  async function boot() {
+    // Vite middleware for development
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        console.log('📦 Initializing Vite middleware...');
+        const { createServer: createViteServer } = await import('vite');
+        const vite = await createViteServer({
+          server: { middlewareMode: true },
+          appType: 'spa',
+        });
+        app.use(vite.middlewares);
+        console.log('✅ Vite middleware initialized.');
+      } catch (viteErr: any) {
+        console.error('❌ Failed to initialize Vite middleware:', viteErr.message);
+      }
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
       });
-      app.use(vite.middlewares);
-      console.log('✅ Vite middleware initialized.');
-    } catch (viteErr: any) {
-      console.error('❌ Failed to initialize Vite middleware:', viteErr.message);
     }
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+
+    console.log(`🚀 Starting server on port ${PORT}...`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server running on http://localhost:${PORT}`);
     });
   }
 
-  console.log(`🚀 Starting server on port ${PORT}...`);
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ Server running on http://localhost:${PORT}`);
-  });
+  boot();
 }
-
-startServer();
