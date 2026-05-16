@@ -26,7 +26,7 @@ const __dirname = path.dirname(__filename);
 // Supabase Configuration
 // Default credentials (updated with user provided project)
 const DEFAULT_URL = 'https://ecjleikavlsiqyazbbvt.supabase.co';
-const DEFAULT_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'votre_cle_secrete_ici'; // REMOVED FOR GITHUB EXPORT SECURITY
+const DEFAULT_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'votre_cle_secrete_ici'; 
 
 // Environment variables priority
 const nextUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -34,6 +34,21 @@ const nextKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const baseUrl = process.env.SUPABASE_URL;
 const baseKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+console.log('🚀 App starting initialization...');
+const app = express();
+const PORT = Number(process.env.PORT) || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+// Logging middleware FIRST
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api')) {
+    console.log(`🚀 [API Request] ${req.method} ${req.url}`);
+  }
+  next();
+});
 
 // Selection logic with pair awareness
 let supabaseUrl = DEFAULT_URL;
@@ -73,34 +88,42 @@ if (isValidKey(serviceKey) && (supabaseUrl !== DEFAULT_URL || !isOldProject)) {
 }
 
 console.log(`📡 Supabase URL: ${supabaseUrl}`);
-const supabase = createClient(supabaseUrl, supabaseKey);
+let supabase: any;
+try {
+  supabase = createClient(supabaseUrl, supabaseKey);
+  console.log('✅ Supabase client initialized.');
+} catch (e: any) {
+  console.error('❌ Error initializing Supabase client:', e.message);
+}
 
 // Helper to determine the correct table name dynamically
 let cachedTable: string | null = null;
 async function getSupabaseTable(force = false) {
   if (cachedTable && !force) return cachedTable;
-  if (!supabase) return 'lienspdfs2';
+  
+  const defaultTable = 'lienspdfs';
+  if (!supabase) {
+    console.warn('⚠️ Supabase client not initialized, using default table name');
+    return defaultTable;
+  }
 
-  const tablesToTry = ['lienspdfs', 'lienspdfs2', 'liens_pdfs', 'lienspdf'];
+  const tablesToTry = [defaultTable, 'lienspdfs2', 'liens_pdfs', 'lienspdf'];
   console.log(`🔍 Supabase: Detecting active table...${force ? ' (FORCED)' : ''}`);
 
   for (const table of tablesToTry) {
     try {
-      // On tente une lecture réelle
-      const { data, count, error } = await supabase.from(table).select('*', { count: 'exact' }).limit(1);
+      const { data, error } = await supabase.from(table).select('*').limit(1);
       
       if (!error) {
-        const rowCount = count !== null ? count : (data ? data.length : 0);
-        console.log(`✅ Supabase: Table active détectée : "${table}" (${rowCount} lignes)`);
+        console.log(`✅ Supabase: Table active détectée : "${table}"`);
         cachedTable = table;
         return table;
       }
       
       console.log(`ℹ️ Supabase: Essai table "${table}" échoué : ${error.message}`);
       
-      // If error is about API key, stop trying other tables to save time/noise
       if (error.message && (error.message.includes('Invalid API key') || error.message.includes('JWT'))) {
-        console.error('❌ FATAL: Supabase API key error. Please check your credentials.');
+        console.error('❌ FATAL: Supabase API key error.');
         break; 
       }
     } catch (e: any) {
@@ -108,8 +131,8 @@ async function getSupabaseTable(force = false) {
     }
   }
 
-  console.warn('⚠️ Supabase: No matching table found in schema. Defaulting to "lienspdfs2"');
-  return 'lienspdfs2'; 
+  console.warn(`⚠️ Supabase: No matching table found. Defaulting to "${defaultTable}"`);
+  return defaultTable; 
 }
 
 // Helper to extract trimester label from row data
@@ -134,23 +157,19 @@ function extractTrimestreLabel(row: any) {
   return 'Général';
 }
 
-const app = express();
-const PORT = 3000;
-
-app.use(cors());
-app.use(express.json());
-
-// Logging middleware FIRST
-app.use((req, res, next) => {
-  if (req.url.startsWith('/api')) {
-    console.log(`🚀 [API Request] ${req.method} ${req.url}`);
-  }
-  next();
-});
+// This chunk was redundant and is removed
 
   // Health check
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), supabase: !!supabase });
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(), 
+      supabase: !!supabase,
+      supabaseUrl: supabaseUrl,
+      hasKey: !!supabaseKey && supabaseKey !== 'votre_cle_secrete_ici',
+      env: process.env.NODE_ENV,
+      vercel: !!process.env.VERCEL
+    });
   });
 
   // Force sync / re-detect table
@@ -769,6 +788,17 @@ app.use((req, res, next) => {
   app.all('/api/*', (req, res) => {
     res.status(404).json({ error: `Route API non trouvée: ${req.method} ${req.url}` });
   });
+
+// Global Error Handler for Express (MUST be last)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('🔥 Global Exception:', err);
+  res.status(500).json({ 
+    error: 'Internal Server Error', 
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    hint: 'Vérifiez les journaux (logs) sur Vercel pour plus de détails.'
+  });
+});
 
 export default app;
 
