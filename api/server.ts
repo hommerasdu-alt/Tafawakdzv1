@@ -96,19 +96,20 @@ try {
   console.error('❌ Error initializing Supabase client:', e.message);
 }
 
-// Helper to determine the correct table name dynamically
-let cachedTable: string | null = null;
-async function getSupabaseTable(force = false) {
-  if (cachedTable && !force) return cachedTable;
+// Helper to determine the correct table names dynamically
+let cachedTables: string[] = [];
+async function getActiveTables(force = false) {
+  if (cachedTables.length > 0 && !force) return cachedTables;
   
   const defaultTable = 'lienspdfs';
   if (!supabase) {
     console.warn('⚠️ Supabase client not initialized, using default table name');
-    return defaultTable;
+    return [defaultTable];
   }
 
-  const tablesToTry = [defaultTable, 'lienspdfs2', 'liens_pdfs', 'lienspdf'];
-  console.log(`🔍 Supabase: Detecting active table...${force ? ' (FORCED)' : ''}`);
+  const tablesToTry = ['lienspdfs', 'lienspdfs1', 'lienspdfs2', 'liens_pdfs', 'lienspdf'];
+  const working: string[] = [];
+  console.log(`🔍 Supabase: Detecting active tables...${force ? ' (FORCED)' : ''}`);
 
   for (const table of tablesToTry) {
     try {
@@ -116,23 +117,26 @@ async function getSupabaseTable(force = false) {
       
       if (!error) {
         console.log(`✅ Supabase: Table active détectée : "${table}"`);
-        cachedTable = table;
-        return table;
-      }
-      
-      console.log(`ℹ️ Supabase: Essai table "${table}" échoué : ${error.message}`);
-      
-      if (error.message && (error.message.includes('Invalid API key') || error.message.includes('JWT'))) {
-        console.error('❌ FATAL: Supabase API key error.');
-        break; 
+        working.push(table);
+      } else {
+        console.log(`ℹ️ Supabase: Essai table "${table}" échoué : ${error.message}`);
+        if (error.message && (error.message.includes('Invalid API key') || error.message.includes('JWT'))) {
+          console.error('❌ FATAL: Supabase API key error.');
+          break; 
+        }
       }
     } catch (e: any) {
       console.log(`❌ Supabase: Erreur critique sur table "${table}": ${e.message}`);
     }
   }
 
-  console.warn(`⚠️ Supabase: No matching table found. Defaulting to "${defaultTable}"`);
-  return defaultTable; 
+  if (working.length === 0) {
+    console.warn(`⚠️ Supabase: No matching table found. Defaulting to ["${defaultTable}"]`);
+    return [defaultTable];
+  }
+
+  cachedTables = working;
+  return working; 
 }
 
 // Helper to extract trimester label from row data
@@ -180,7 +184,8 @@ function extractTrimestreLabel(row: any) {
   app.get('/api/sync', async (req, res) => {
     try {
       console.log('🔄 Forced synchronization requested...');
-      const tableName = await getSupabaseTable(true);
+      const tableNames = await getActiveTables(true);
+      const tableName = tableNames[0] || 'lienspdfs';
       res.json({ 
         status: 'success', 
         message: 'Synchronisation réussie', 
@@ -198,7 +203,8 @@ function extractTrimestreLabel(row: any) {
     
     try {
       console.log('📤 Starting bulk CSV import to Supabase...');
-      const tableName = await getSupabaseTable();
+      const tableNames = await getActiveTables();
+      const tableName = tableNames[0] || 'lienspdfs';
       
       if (csvData.length === 0) {
         return res.status(400).json({ error: 'Aucune donnée CSV à importer' });
@@ -255,7 +261,8 @@ function extractTrimestreLabel(row: any) {
     
     try {
       console.log('📥 Exporting data from Supabase to CSV...');
-      const tableName = await getSupabaseTable();
+      const tableNames = await getActiveTables();
+      const tableName = tableNames[0] || 'lienspdfs';
       
       const { data, error } = await supabase
         .from(tableName)
@@ -333,31 +340,34 @@ function extractTrimestreLabel(row: any) {
     
     try {
       console.log('🧪 Testing Supabase connection...');
-      const tableName = await getSupabaseTable(true);
-      const { count, error } = await supabase.from(tableName).select('*', { count: 'exact', head: true });
+      const tableNames = await getActiveTables(true);
+      const results = [];
       
-      if (error) {
-        console.error(`❌ Supabase test error on table "${tableName}":`, error.message || 'Unknown error');
-        
-        const isAuthError = error.message?.includes('Invalid API key') || error.message?.includes('JWT') || error.code === '401';
-        
+      for (const tableName of tableNames) {
+        const { count, error } = await supabase.from(tableName).select('*', { count: 'exact', head: true });
+        results.push({
+          table: tableName,
+          count: count || 0,
+          error: error ? error.message : null
+        });
+      }
+      
+      const mainError = results.find(r => r.error)?.error;
+      
+      if (tableNames.length === 0) {
         return res.status(500).json({ 
           status: 'error', 
-          message: error.message || 'Erreur de connexion Supabase',
-          isAuthError,
-          hint: error.hint,
-          details: error.details,
-          table: tableName
+          message: 'Aucune table active détectée.',
+          results
         });
       }
 
-      console.log(`✅ Supabase test success! Found ${count} rows in table "${tableName}"`);
+      console.log(`✅ Supabase test success! Found ${tableNames.length} tables.`);
       return res.json({
         status: 'success',
         url: supabaseUrl,
-        table: tableName,
-        rows: count,
-        message: count === 0 ? 'Connecté, mais la table est vide.' : 'Connecté et données trouvées !'
+        tables: results,
+        message: 'Connexion aux sources Supabase établie !'
       });
     } catch (e: any) {
       console.error('❌ Supabase test critical failure:', e.message);
@@ -370,29 +380,33 @@ function extractTrimestreLabel(row: any) {
     try {
       let data: any[] = [];
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // Increased timeout to 10s
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s for multitable stats
 
       if (supabase) {
         try {
-          console.log('📊 Fetching stats from Supabase...');
-          const tableName = await getSupabaseTable();
-          const { data: supaData, error } = await supabase
-            .from(tableName)
-            .select('*') 
-            .limit(20000) // Increased limit to capture all data for stats
-            .abortSignal(controller.signal);
+          console.log('📊 Fetching stats from Supabase multiple tables...');
+          const tableNames = await getActiveTables();
           
-          if (error) {
-            console.warn('⚠️ Supabase stats error:', error.message);
-            if (error.message.includes('Invalid API key')) {
-              console.error('❌ La clé API Supabase est rejetée. Vérifiez vos variables d\'environnement.');
+          for (const tableName of tableNames) {
+            try {
+              const { data: supaData, error } = await supabase
+                .from(tableName)
+                .select('*') 
+                .limit(20000) 
+                .abortSignal(controller.signal);
+              
+              if (error) {
+                console.warn(`⚠️ Supabase stats error table ${tableName}:`, error.message);
+              } else if (supaData) {
+                data.push(...supaData);
+                console.log(`✅ Table "${tableName}": Collected ${supaData.length} records.`);
+              }
+            } catch (e) {
+              console.warn(`⚠️ Table ${tableName} fetch failed.`);
             }
-          } else {
-            data = supaData || [];
-            console.log(`✅ Fetched ${data.length} rows from Supabase table "${tableName}".`);
           }
         } catch (supaErr: any) {
-          console.warn('⚠️ Supabase fetch aborted or failed:', supaErr.message);
+          console.warn('⚠️ Supabase stats fetch aborted or failed:', supaErr.message);
         } finally {
           clearTimeout(timeoutId);
         }
@@ -559,24 +573,37 @@ function extractTrimestreLabel(row: any) {
     if (supabase) {
       try {
         console.log(`🔍 Querying Supabase for subject: ${matiere}`);
-        const tableName = await getSupabaseTable();
+        const tableNames = await getActiveTables();
+        const allData: any[] = [];
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout for this query
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-        // Fetch with higher limit to ensure we see all data
-        const { data, error } = await supabase
-          .from(tableName)
-          .select('*')
-          .limit(10000)
-          .abortSignal(controller.signal);
+        for (const tableName of tableNames) {
+          try {
+            console.log(`👉 Querying table: ${tableName}`);
+            const { data, error } = await supabase
+              .from(tableName)
+              .select('*')
+              .limit(10000)
+              .abortSignal(controller.signal);
+
+            if (!error && data) {
+              allData.push(...data);
+            } else if (error) {
+              console.warn(`⚠️ Error in table ${tableName}: ${error.message}`);
+            }
+          } catch (e) {
+            console.warn(`⚠️ Failed to fetch from ${tableName}`);
+          }
+        }
 
         clearTimeout(timeoutId);
 
-        if (!error && data && data.length > 0) {
-          console.log(`✅ Loaded ${data.length} rows from Supabase, filtering...`);
+        if (allData.length > 0) {
+          console.log(`✅ Loaded ${allData.length} total rows from ${tableNames.length} tables, filtering...`);
           
-          const filtered = data.filter((row: any) => {
+          const filtered = allData.filter((row: any) => {
             try {
               const rowMatiere = (
                 row.matiere || row['Matière'] || row.Matiere || 
@@ -596,9 +623,6 @@ function extractTrimestreLabel(row: any) {
               
               const matchPath = targetLabels.some(label => rowPath.includes(`/${label}`) || rowPath.includes(`/${label}/`));
               
-              // New: Also match by level if path and subject are ambiguous
-              const matchLevel = rowAnnee.includes('2am') || rowPath.includes('/2am/');
-
               return matchSubject || matchPath;
             } catch (e) {
               return false;
@@ -623,12 +647,6 @@ function extractTrimestreLabel(row: any) {
             });
             return res.json(mapped);
           }
-        }
-        
-        if (error) {
-          console.warn(`⚠️ Supabase Query error: ${error.message}`);
-        } else {
-          console.log(`ℹ️ No results in Supabase for ${matiere}`);
         }
       } catch (err: any) {
         console.warn(`⚠️ Supabase connection failed or timed out: ${err.message}`);
@@ -700,8 +718,9 @@ function extractTrimestreLabel(row: any) {
 
     if (supabase) {
       try {
-        console.log(`🔍 Supabase global search: ${query}`);
-        const tableName = await getSupabaseTable();
+        console.log(`🔍 Supabase global search in multiple tables: ${query}`);
+        const tableNames = await getActiveTables();
+        const allSupaData: any[] = [];
         
         // Intelligence: check if query matches a known subject alias
         const aliases = [];
@@ -719,7 +738,6 @@ function extractTrimestreLabel(row: any) {
           'documents': ['docs', 'document', 'documents', 'مستندات', 'مستندات تعليمية']
         };
 
-        let activeQuery = query;
         Object.entries(subjectMapping).forEach(([key, values]: [string, any]) => {
           if (values.includes(query) || key === query) {
             aliases.push(...values, key);
@@ -727,18 +745,28 @@ function extractTrimestreLabel(row: any) {
         });
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-        const { data, error } = await supabase
-          .from(tableName)
-          .select('*')
-          .limit(10000)
-          .abortSignal(controller.signal);
+        for (const tableName of tableNames) {
+          try {
+            const { data, error } = await supabase
+              .from(tableName)
+              .select('*')
+              .limit(10000)
+              .abortSignal(controller.signal);
+            
+            if (!error && data) {
+              allSupaData.push(...data);
+            }
+          } catch (e) {
+            console.warn(`⚠️ Search in table ${tableName} failed.`);
+          }
+        }
         
         clearTimeout(timeoutId);
         
-        if (!error && data && data.length > 0) {
-          const filtered = data.filter((row: any) => {
+        if (allSupaData.length > 0) {
+          const filtered = allSupaData.filter((row: any) => {
              try {
                const rowMatiere = (row.matiere || '').toLowerCase();
                const rowAnnee = (row.annee || '').toLowerCase();
@@ -750,7 +778,7 @@ function extractTrimestreLabel(row: any) {
              } catch (e) {
                return false;
              }
-          }).slice(0, 100);
+          }).slice(0, 150);
 
           const mapped = filtered.map((row: any) => {
             return {
