@@ -677,6 +677,7 @@ export default function App() {
               {isDarkMode ? <Lightbulb size={20} /> : <Moon size={20} />}
             </button>
 
+            {/* Database Button Hidden as requested
             <button 
               onClick={() => setIsDbDashboardOpen(!isDbDashboardOpen)}
               className={`p-2.5 rounded-xl border-2 transition-all gold-3d ${isDbDashboardOpen ? 'bg-dz-gold text-dz-green-dark border-dz-gold' : 'border-dz-gold/30 hover:border-dz-gold bg-white/50 dark:bg-slate-800/50 text-dz-dark dark:text-dz-gold'}`}
@@ -684,6 +685,7 @@ export default function App() {
             >
               <Database size={20} />
             </button>
+            */}
             
             <div className="relative group hidden md:block">
                <button 
@@ -911,7 +913,8 @@ export default function App() {
               </div>
             ) */}
             {/* Decorative stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12 py-12 border-t-2 border-dz-gold/10">
+            {/* Decorative stats - Hidden as requested */}
+            {/* <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12 py-12 border-t-2 border-dz-gold/10">
               {[
                 { label: 'ملف تعليمي', value: getGlobalCount() || '111,000+', color: 'text-dz-green', icon: Library, bg: 'bg-dz-green/10' },
                 { label: 'مواضيع مقترحة', value: '45,000+', color: 'text-dz-gold', icon: Lightbulb, bg: 'bg-dz-gold/10' },
@@ -926,7 +929,7 @@ export default function App() {
                   <div className="text-xs font-black text-slate-600 dark:text-slate-400">{stat.label}</div>
                 </div>
               ))}
-            </div>
+            </div> */}
           </div>
         ) : (
           <div className="grid grid-cols-12 gap-8">

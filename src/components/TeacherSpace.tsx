@@ -20,8 +20,23 @@ interface StudentGrade {
   id: string;
   name: string;
   grade: number | string;
+  appreciation?: string;
+  advice?: string;
   note?: string;
 }
+
+const getAppraisal = (grade: number | string) => {
+  const g = typeof grade === 'string' ? parseFloat(grade) : grade;
+  if (isNaN(g)) return { appreciation: '-', advice: '-' };
+  
+  if (g >= 18) return { appreciation: 'نتائج ممتازة', advice: 'نتائج ممتازة ومرضية واصل' };
+  if (g >= 15) return { appreciation: 'نتائج جيدة', advice: 'نتائج جيدة ومشجعة واصل' };
+  if (g >= 14) return { appreciation: 'نتائج حسنة', advice: 'واصل الاجتهاد و المثابرة' };
+  if (g >= 12) return { appreciation: 'نتائج حسنة', advice: 'نتائج مقبولة بامكانك تحسينها' };
+  if (g >= 10) return { appreciation: 'نتائج متوسطة', advice: 'بمقدورك تحقيق نتائج أفضل' };
+  if (g >= 5) return { appreciation: 'نتائج دون الوسط', advice: 'ينقصك الحرص و التركيز' };
+  return { appreciation: 'نتائج غير مقبول', advice: 'احذر التهاون' };
+};
 
 export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [dragActive, setDragActive] = React.useState(false);
@@ -29,10 +44,6 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
-  const [headerMap, setHeaderMap] = React.useState<Record<string, string>>({
-    name: '',
-    grade: ''
-  });
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -50,35 +61,101 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
     setSuccess(false);
 
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
+      let workbook;
+      const arrayBuffer = await file.arrayBuffer();
+      
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        // Handle Arabic encoding (Windows-1256) which is common in Algerian CSV exports
+        let decoder = new TextDecoder('utf-8');
+        let content = decoder.decode(arrayBuffer);
+        
+        // If UTF-8 doesn't show Arabic characters but we expect them, or if it has replacement chars
+        if (!/[\u0600-\u06FF]/.test(content) || content.includes('')) {
+          try {
+            const arabicDecoder = new TextDecoder('windows-1256');
+            const arabicContent = arabicDecoder.decode(arrayBuffer);
+            // If Windows-1256 produces Arabic where UTF-8 didn't, use it
+            if (/[\u0600-\u06FF]/.test(arabicContent)) {
+              content = arabicContent;
+            }
+          } catch (e) {
+            console.error('Arabic decoding failed:', e);
+          }
+        }
+        workbook = XLSX.read(content, { type: 'string' });
+      } else {
+        workbook = XLSX.read(arrayBuffer);
+      }
+
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      const json = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-      if (json.length === 0) {
-        throw new Error('الملف فارغ أو غير صالح');
-      }
-
-      // Try to auto-detect headers
-      const firstRow = json[0];
-      const keys = Object.keys(firstRow);
       
-      let nameKey = keys.find(k => k.toLowerCase().includes('name') || k.includes('اسم') || k.includes('لقب'));
-      let gradeKey = keys.find(k => k.toLowerCase().includes('grade') || k.toLowerCase().includes('mark') || k.toLowerCase().includes('score') || k.includes('نقطة') || k.includes('علامة') || k.includes('معدل'));
+      // Get all rows as dynamic arrays
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" }) as any[][];
 
-      if (!nameKey || !gradeKey) {
-        // Just take first two columns if no match
-        nameKey = keys[0];
-        gradeKey = keys[1];
+      if (rows.length <= 7) {
+        throw new Error('الملف لا يحتوي على بيانات كافية (يجب أن يتجاوز 7 أسطر لتروية المؤسسة)');
       }
 
-      const formattedData: StudentGrade[] = json.map((row, idx) => ({
-        id: (idx + 1).toString(),
-        name: row[nameKey!] || 'غير معروف',
-        grade: row[gradeKey!] || 0,
-        note: row['ملاحظة'] || row['note'] || ''
-      }));
+      // Skip exactly 7 lines as requested (Metadata). Start processing from line 8.
+      // Often line 8/9 are headers, data usually starts around line 10 in these Algerian templates.
+      const dataRows = rows.slice(7); 
+      
+      // Dynamic column identification
+      let nomIdx = -1;
+      let prenomIdx = -1;
+      let gradeIdx = -1;
+
+      // Find the header row (looking for "nom", "prenom", "matricule", or "/" in line 8 or 9)
+      const headerCandidates = dataRows.slice(0, 3);
+      let skipRows = 0;
+
+      for (let r = 0; r < headerCandidates.length; r++) {
+        const row = headerCandidates[r];
+        for (let c = 0; c < row.length; c++) {
+          const val = String(row[c]).toLowerCase();
+          if (val.includes('nom') || val.includes('اللقب')) nomIdx = c;
+          if (val.includes('prenom') || val.includes('الاسم')) prenomIdx = c;
+          if (val.includes('09') || val.includes('المعدل') || val.includes('moyenne') || val.includes('/20')) gradeIdx = c;
+        }
+        if (nomIdx !== -1 || gradeIdx !== -1) {
+          skipRows = r + 1; // Skip the header row(s) too
+          break;
+        }
+      }
+
+      // Fallbacks if detection failed on header
+      if (nomIdx === -1) nomIdx = 1; // Algerian templates often have Nom at Col B
+      if (prenomIdx === -1) prenomIdx = 2; // Prenom at Col C
+      if (gradeIdx === -1) gradeIdx = 7; // Average often at Col H (Idx 7)
+
+      const finalRows = dataRows.slice(skipRows);
+
+      const formattedData: StudentGrade[] = finalRows
+        .filter(row => row.length > 0 && row[nomIdx] !== undefined && String(row[nomIdx]).trim() !== "")
+        .map((row, idx) => {
+          // Combine Nom and Prenom if separate
+          const lastName = row[nomIdx] ? String(row[nomIdx]).trim() : '';
+          const firstName = prenomIdx !== -1 && row[prenomIdx] ? String(row[prenomIdx]).trim() : '';
+          const fullName = firstName ? `${lastName} ${firstName}` : lastName;
+
+          // Find grade by searching for the numeric value in the detected grade column
+          let grade = 0;
+          if (gradeIdx !== -1 && row[gradeIdx] !== undefined) {
+            const parsed = parseFloat(String(row[gradeIdx]).replace(',', '.'));
+            grade = !isNaN(parsed) ? parsed : 0;
+          }
+
+          const appraisals = getAppraisal(grade);
+          return {
+            id: (idx + 1).toString(),
+            name: fullName || 'غير معروف',
+            grade: grade,
+            appreciation: appraisals.appreciation,
+            advice: appraisals.advice,
+            note: '' 
+          };
+        });
 
       setExtractedData(formattedData);
       setSuccess(true);
@@ -114,14 +191,54 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
 
   const downloadSample = () => {
     const sampleData = [
-      { 'اسم التلميذ': 'محمد بلقاسم', 'النقطة': 18.5, 'ملاحظة': 'ممتاز' },
-      { 'اسم التلميذ': 'فاطمة الزهراء', 'النقطة': 15.0, 'ملاحظة': 'جيد جدا' },
-      { 'اسم التلميذ': 'أحمد سعيد', 'النقطة': 12.0, 'ملاحظة': 'قريب من الجيد' }
+      { 'اسم التلميذ': 'محمد بلقاسم', 'النقطة': 19.25, 'التقدير': 'نتائج ممتازة', 'الإرشادات': 'نتائج ممتازة ومرضية واصل' },
+      { 'اسم التلميذ': 'فاطمة الزهراء', 'النقطة': 16.5, 'التقدير': 'نتائج جيدة', 'الإرشادات': 'نتائج جيدة ومشجعة واصل' },
+      { 'اسم التلميذ': 'أحمد سعيد', 'النقطة': 12.25, 'التقدير': 'نتائج حسنة', 'الإرشادات': 'نتائج مقبولة بامكانك تحسينها' },
+      { 'اسم التلميذ': 'كمال يونس', 'النقطة': 9.5, 'التقدير': 'نتائج متوسطة', 'الإرشادات': 'بمقدورك تحقيق نتائج أفضل' },
+      { 'اسم التلميذ': 'سارة علوي', 'النقطة': 3.75, 'التقدير': 'نتائج دون الوسط', 'الإرشادات': 'ينقصك الحرص والتركيز' },
+      { 'اسم التلميذ': 'ياسين بن علي', 'النقطة': 14.75, 'التقدير': 'نتائج حسنة', 'الإرشادات': 'واصل الاجتهاد و المثابرة' },
+      { 'اسم التلميذ': 'ليلى مراد', 'النقطة': 0, 'التقدير': 'نتائج غير مقبول', 'الإرشادات': 'احذر التهاون' }
     ];
     const ws = XLSX.utils.json_to_sheet(sampleData);
+    
+    // Set column widths for better visibility
+    ws['!cols'] = [
+      { wch: 25 }, // Name
+      { wch: 10 }, // Grade
+      { wch: 20 }, // Appraisal
+      { wch: 35 }  // Advice
+    ];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "النقاط");
-    XLSX.writeFile(wb, "نموذج_حجز_النقاط.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "قائمة النقاط");
+    XLSX.writeFile(wb, "نموذج_حجز_النقاط_تفوّق.xlsx");
+  };
+
+  const downloadResults = () => {
+    if (extractedData.length === 0) return;
+
+    const exportData = extractedData.map(student => ({
+      'الترتيب': student.id,
+      'اسم التلميذ': student.name,
+      'النقطة (/20)': student.grade,
+      'التقدير': student.appreciation,
+      'الإرشادات': student.advice
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 8 },  // ID
+      { wch: 25 }, // Name
+      { wch: 12 }, // Grade
+      { wch: 20 }, // Appraisal
+      { wch: 40 }  // Advice
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "النتائج المستخرجة");
+    XLSX.writeFile(wb, `نتائج_النقاط_المستخرجة_${new Date().toLocaleDateString('ar-DZ').replace(/\//g, '-')}.xlsx`);
   };
 
   return (
@@ -232,8 +349,8 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
                       {[
                         'تأكد أن العمود الأول يحتوي على أسماء التلاميذ.',
                         'العمود الثاني يجب أن يحتوي على النقاط المسجلة.',
-                        'المنصة تدعم صيغ .xlsx و .xls و .csv.',
-                        'يمكنك تعديل الأسماء أو النقاط يدوياً بعد الاستخراج.'
+                        'يقوم النظام تلقائياً بتوليد التقديرات والإرشادات بناءً على العلامة.',
+                        'يمكنك تعديل الأسماء أو النقاط يدوياً وتحديث الأوصاف تلقائياً.'
                       ].map((tip, i) => (
                         <li key={i} className="flex gap-2 text-[11px] font-bold text-slate-600 dark:text-emerald-100/70">
                           <span className="text-dz-gold">•</span>
@@ -259,6 +376,13 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
                         </div>
                         <div className="flex items-center gap-2">
                            <button 
+                             onClick={downloadResults}
+                             className="p-2 text-dz-green hover:bg-dz-green/10 rounded-lg transition-colors border border-dz-green/20"
+                             title="تحميل النتائج كملف Excel"
+                           >
+                             <Download size={16} />
+                           </button>
+                           <button 
                              onClick={clearData}
                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
                              title="مسح البيانات"
@@ -282,17 +406,18 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
                         <table className="w-full text-center">
                           <thead className="bg-slate-50 dark:bg-white/5 text-[11px] font-black uppercase text-dz-green-dark dark:text-dz-gold border-b-2 border-dz-gold/10">
                             <tr>
-                              <th className="px-6 py-4">الترتيب</th>
-                              <th className="px-6 py-4 text-right">اسم التلميذ</th>
-                              <th className="px-6 py-4">النقطة (/20)</th>
-                              <th className="px-6 py-4">الملاحظة</th>
+                              <th className="px-4 py-4">الترتيب</th>
+                              <th className="px-4 py-4 text-right">اسم التلميذ</th>
+                              <th className="px-4 py-4">النقطة (/20)</th>
+                              <th className="px-4 py-4">التقديرات</th>
+                              <th className="px-4 py-4">الإرشادات</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-dz-gold/5">
                             {extractedData.map((student, idx) => (
                               <tr key={student.id} className="hover:bg-dz-bg/30 dark:hover:bg-white/5 transition-colors">
-                                <td className="px-6 py-4 text-xs font-black text-slate-400">{student.id}</td>
-                                <td className="px-6 py-4 text-xs font-black text-dz-dark dark:text-white text-right">
+                                <td className="px-4 py-4 text-xs font-black text-slate-400">{student.id}</td>
+                                <td className="px-4 py-4 text-xs font-black text-dz-dark dark:text-white text-right">
                                   <input 
                                     type="text" 
                                     value={student.name}
@@ -304,7 +429,7 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
                                     className="bg-transparent border-none focus:ring-0 w-full text-right font-black"
                                   />
                                 </td>
-                                <td className="px-6 py-4">
+                                <td className="px-4 py-4">
                                   <div className="flex items-center justify-center gap-2">
                                     <input 
                                       type="number" 
@@ -314,7 +439,11 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
                                       value={student.grade}
                                       onChange={(e) => {
                                         const newData = [...extractedData];
-                                        newData[idx].grade = e.target.value;
+                                        const val = e.target.value;
+                                        newData[idx].grade = val;
+                                        const appraisals = getAppraisal(val);
+                                        newData[idx].appreciation = appraisals.appreciation;
+                                        newData[idx].advice = appraisals.advice;
                                         setExtractedData(newData);
                                       }}
                                       className={`w-16 p-1.5 rounded-lg border-2 text-center font-black text-xs ${
@@ -323,18 +452,17 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
                                     />
                                   </div>
                                 </td>
-                                <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
-                                  <input 
-                                    type="text" 
-                                    placeholder="أضف ملاحظة..."
-                                    value={student.note || ''}
-                                    onChange={(e) => {
-                                      const newData = [...extractedData];
-                                      newData[idx].note = e.target.value;
-                                      setExtractedData(newData);
-                                    }}
-                                    className="bg-transparent border-none focus:ring-0 text-center w-full italic"
-                                  />
+                                <td className="px-4 py-4">
+                                   <span className={`text-[11px] font-black px-3 py-1 rounded-full ${
+                                     Number(student.grade) >= 16 ? 'bg-dz-green text-white' : 
+                                     Number(student.grade) >= 12 ? 'bg-dz-gold/20 text-dz-green-dark' :
+                                     Number(student.grade) >= 10 ? 'bg-dz-gold/10 text-dz-dark' : 'bg-red-100 text-red-600'
+                                   }`}>
+                                     {student.appreciation}
+                                   </span>
+                                </td>
+                                <td className="px-4 py-4 text-[11px] font-bold text-slate-500 dark:text-emerald-100/70 text-right">
+                                  {student.advice}
                                 </td>
                               </tr>
                             ))}
