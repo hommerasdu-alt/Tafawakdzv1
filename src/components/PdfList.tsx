@@ -41,6 +41,8 @@ interface CategoryItemProps {
   isOpen: boolean;
   onToggle: (isOpen: boolean) => void;
   selectedYear: string | null;
+  selectedSpecialtyId: string | null;
+  selectedSpecialtyLabel?: string | null;
   selectedSubject: Subject | undefined;
   subjects: Subject[];
   remoteFiles: RemoteFile[];
@@ -55,6 +57,8 @@ const CategoryItem: React.FC<CategoryItemProps> = ({
   isOpen, 
   onToggle, 
   selectedYear, 
+  selectedSpecialtyId,
+  selectedSpecialtyLabel,
   selectedSubject,
   subjects,
   remoteFiles,
@@ -72,8 +76,40 @@ const CategoryItem: React.FC<CategoryItemProps> = ({
     const matchesYear = f.levelYear === selectedYear;
     const matchesSubject = f.subject === selectedSubject?.id || f.subject === selectedSubject?.arabicName;
     const matchesCategory = f.category === category.label;
-    return matchesYear && matchesSubject && matchesCategory;
-  }), [remoteFiles, selectedYear, selectedSubject, category.label]);
+    
+    // If a specialty is selected, try to match it if the file has a specialty field
+    let matchesSpecialty = true;
+    if (selectedSpecialtyId) {
+      const fileFilliere = (f as any).filliere || (f as any).filiere || '';
+      const specialty = selectedSpecialtyId.toLowerCase();
+      
+      if (specialty.includes('scientific')) {
+         matchesSpecialty = !fileFilliere || 
+                           fileFilliere.toLowerCase().includes('scientific') ||
+                           fileFilliere.toLowerCase().includes('se') || 
+                           fileFilliere.toLowerCase().includes('m') || 
+                           fileFilliere.toLowerCase().includes('tm') ||
+                           fileFilliere.includes('علوم') || 
+                           fileFilliere.includes('رياضيات') || 
+                           fileFilliere.includes('تقني');
+      } else if (specialty.includes('literary')) {
+         matchesSpecialty = !fileFilliere || 
+                           fileFilliere.toLowerCase().includes('literary') ||
+                           fileFilliere.toLowerCase().includes('lp') || 
+                           fileFilliere.toLowerCase().includes('le') || 
+                           fileFilliere.includes('آداب') || 
+                           fileFilliere.includes('لغات');
+      } else if (specialty.includes('ge')) {
+         matchesSpecialty = !fileFilliere || 
+                           fileFilliere.toLowerCase().includes('ge') || 
+                           fileFilliere.includes('تسيير');
+      } else {
+         matchesSpecialty = !fileFilliere || fileFilliere.toLowerCase().includes(specialty);
+      }
+    }
+    
+    return matchesYear && matchesSubject && matchesCategory && matchesSpecialty;
+  }), [remoteFiles, selectedYear, selectedSubject, category.label, selectedSpecialtyId]);
 
   const stats = React.useMemo(() => {
     const total = categoryFiles.length > 0 ? categoryFiles.length : category.defaultCount;
@@ -159,7 +195,7 @@ const CategoryItem: React.FC<CategoryItemProps> = ({
       >
           <div className="flex-1 text-center flex items-center justify-center gap-2 sm:gap-4 overflow-hidden">
             <span className={`${isOpen ? `text-${sectionColor}` : 'text-white'} text-[clamp(9px,2.5vw,14px)] font-black transition-colors leading-tight break-words py-1`}>
-              {selectedSubject?.arabicName} - {category.label}
+              {selectedSubject?.arabicName} {selectedSpecialtyId && selectedSpecialtyLabel ? `- ${selectedSpecialtyLabel}` : ''} - {category.label}
             </span>
             <div className="flex items-center gap-2">
               <span className={`bg-black/20 text-white/70 text-[9px] font-black px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1 transition-all shrink-0 ${isOpen ? `bg-${sectionColor} text-white` : 'group-hover:bg-dz-gold group-hover:text-dz-green-dark'}`}>
@@ -307,6 +343,8 @@ const CategoryItem: React.FC<CategoryItemProps> = ({
 
 interface PdfListProps {
   selectedYear: string | null;
+  selectedSpecialtyId: string | null;
+  selectedSpecialtyLabel?: string | null;
   selectedSubjectId: string | null;
   subjects: Subject[];
   remoteFiles: RemoteFile[];
@@ -319,6 +357,8 @@ interface PdfListProps {
 
 const PdfList: React.FC<PdfListProps> = ({
   selectedYear,
+  selectedSpecialtyId,
+  selectedSpecialtyLabel,
   selectedSubjectId,
   subjects,
   remoteFiles,
@@ -335,13 +375,21 @@ const PdfList: React.FC<PdfListProps> = ({
   const [isLoading, setIsLoading] = React.useState(false);
   const [fetchError, setFetchError] = React.useState<string | null>(null);
 
+  const specialtyLabel = React.useMemo(() => {
+    return selectedSpecialtyLabel || null;
+  }, [selectedSpecialtyLabel]);
+
   React.useEffect(() => {
     const fetchSqlFiles = async () => {
       if (!selectedSubject) return;
       setIsLoading(true);
       setFetchError(null);
     try {
-      const response = await fetch(`/api/sujets/${selectedSubject.id}`);
+      let url = `/api/sujets/${selectedSubject.id}`;
+      if (selectedSpecialtyId) {
+        url += `?filiere=${encodeURIComponent(selectedSpecialtyId)}`;
+      }
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
       }
@@ -448,7 +496,7 @@ const PdfList: React.FC<PdfListProps> = ({
     }
     };
     fetchSqlFiles();
-  }, [selectedSubject, selectedYear]);
+  }, [selectedSubject, selectedYear, selectedSpecialtyId]);
 
   const allFiles = React.useMemo(() => [...remoteFiles, ...sqlFiles], [remoteFiles, sqlFiles]);
 
@@ -493,7 +541,7 @@ const PdfList: React.FC<PdfListProps> = ({
         
         <div className="p-8 text-center border-b border-dz-gold/10">
           <p className="text-dz-dark dark:text-emerald-50 text-sm font-black leading-relaxed max-w-2xl mx-auto italic">
-            كل ما يشمل مادة {selectedSubject?.arabicName} لمستوى {getYearLabel(selectedYear)} من ملفات اختبار و فرض و كذلك وثائق للتلميذ والأستاذ والعديد من الملخصات والقصاصات المساعدة على التعلم
+            كل ما يشمل مادة {selectedSubject?.arabicName} {selectedSpecialtyId && selectedSpecialtyLabel ? `(${selectedSpecialtyLabel})` : ''} لمستوى {getYearLabel(selectedYear)} من ملفات اختبار و فرض و كذلك وثائق للتلميذ والأستاذ والعديد من الملخصات والقصاصات المساعدة على التعلم
           </p>
         </div>
       </div>
@@ -506,6 +554,8 @@ const PdfList: React.FC<PdfListProps> = ({
               isOpen={expandedCategoryIdx === idx} 
               onToggle={(isOpen) => setExpandedCategoryIdx(isOpen ? idx : null)} 
               selectedYear={selectedYear} 
+              selectedSpecialtyId={selectedSpecialtyId}
+              selectedSpecialtyLabel={selectedSpecialtyLabel}
               selectedSubject={selectedSubject}
               subjects={subjects}
               remoteFiles={allFiles} 

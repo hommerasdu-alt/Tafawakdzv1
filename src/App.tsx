@@ -36,11 +36,17 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { mapCodeToYear } from './utils';
 
+interface Year {
+  id: string;
+  label: string;
+  specialties?: { id: string; label: string }[];
+}
+
 interface Level {
   id: string;
   name: string;
   color: string;
-  years: { id: string; label: string }[];
+  years: Year[];
 }
 
 interface RemoteFile {
@@ -106,6 +112,7 @@ const levelImages: Record<string, string> = {
 
 export default function App() {
   const [selectedYear, setSelectedYear] = React.useState<string | null>(null);
+  const [selectedSpecialtyId, setSelectedSpecialtyId] = React.useState<string | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = React.useState<string | null>(null);
   const [expandedCategoryIdx, setExpandedCategoryIdx] = React.useState<number | null>(null);
   const [expandedLevel, setExpandedLevel] = React.useState<string | null>(null);
@@ -319,10 +326,19 @@ export default function App() {
     return results.slice(0, 8);
   }, [searchQuery]);
 
-  const currentLevelId = React.useMemo(() => {
+  const selectedYearObj = React.useMemo(() => {
     if (!selectedYear) return null;
-    return levels.find(l => l.years.some(y => y.id === selectedYear))?.id;
+    for (const level of levels) {
+      const year = level.years.find(y => y.id === selectedYear);
+      if (year) return year;
+    }
+    return null;
   }, [selectedYear]);
+
+  const selectedSpecialtyLabel = React.useMemo(() => {
+    if (!selectedSpecialtyId || !selectedYearObj?.specialties) return null;
+    return selectedYearObj.specialties.find(s => s.id === selectedSpecialtyId)?.label;
+  }, [selectedSpecialtyId, selectedYearObj]);
 
   const getSubjectFileCount = React.useCallback((subjectId: string) => {
     if (!selectedYear) return 0;
@@ -330,10 +346,42 @@ export default function App() {
     // 1. Try to find the count in statsData (fetched from /api/stats)
     if (statsData.length > 0) {
       // Find all stats for the current year and subject (ignore trimestre for global subject count)
-      const subjectStats = statsData.filter(s => 
-        (s.annee === selectedYear || s.cycle === selectedYear) && 
-        s.matiere === subjectId
-      );
+      const subjectStats = statsData.filter(s => {
+        const matchesYear = (s.annee === selectedYear || s.cycle === selectedYear);
+        const matchesSubject = s.matiere === subjectId;
+        
+        let matchesSpecialty = true;
+        if (selectedSpecialtyId) {
+          const sFilliere = ((s as any).filiere || (s as any).filliere || '').toLowerCase();
+          const specialty = selectedSpecialtyId.toLowerCase();
+          
+          if (specialty.includes('scientific')) {
+             matchesSpecialty = !sFilliere || 
+                               sFilliere.includes('scientific') ||
+                               sFilliere.includes('se') || 
+                               sFilliere.includes('m') || 
+                               sFilliere.includes('tm') ||
+                               sFilliere.includes('علوم') || 
+                               sFilliere.includes('رياضيات') || 
+                               sFilliere.includes('تقني');
+          } else if (specialty.includes('literary')) {
+             matchesSpecialty = !sFilliere || 
+                               sFilliere.includes('literary') ||
+                               sFilliere.includes('lp') || 
+                               sFilliere.includes('le') || 
+                               sFilliere.includes('آداب') || 
+                               sFilliere.includes('لغات');
+          } else if (specialty.includes('ge')) {
+             matchesSpecialty = !sFilliere || 
+                               sFilliere.includes('ge') || 
+                               sFilliere.includes('تسيير');
+          } else {
+             matchesSpecialty = !sFilliere || sFilliere.includes(specialty);
+          }
+        }
+        
+        return matchesYear && matchesSubject && matchesSpecialty;
+      });
       
       const totalCount = subjectStats.reduce((acc, curr) => acc + curr.count, 0);
       if (totalCount > 0) return totalCount;
@@ -347,13 +395,12 @@ export default function App() {
 
     if (realCount > 0) return realCount;
 
-    // 3. Last fallback to estimation for consistency of UI
-    const hash = (selectedYear + subjectId).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return 120 + (hash % 150);
+    return 0;
   }, [selectedYear, remoteFiles, statsData]);
 
   React.useEffect(() => {
     setSelectedSubjectId(null);
+    setSelectedSpecialtyId(null);
     setExpandedCategoryIdx(null);
   }, [selectedYear]);
 
@@ -943,36 +990,86 @@ export default function App() {
                 <>
                   <div className="bg-dz-green py-10 px-8 text-center text-white gold-3d relative overflow-hidden rounded-2xl shadow-xl border-2 border-dz-gold/20 mb-6">
                     <div className="absolute inset-0 bg-gradient-to-t from-dz-green/95 via-dz-green/50 to-transparent z-10"></div>
+                    <div className="relative z-20">
+                       <h3 className="text-2xl font-black mb-2">{getYearLabel(selectedYear)}</h3>
+                       {selectedSpecialtyId && (
+                         <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/20 rounded-full border border-white/30 text-xs font-black">
+                            <Sparkles size={14} className="text-dz-gold" />
+                            <span>{selectedYearObj?.specialties?.find(s => s.id === selectedSpecialtyId)?.label}</span>
+                         </div>
+                       )}
+                    </div>
                   </div>
                   
-                  <div className="bg-dz-green-dark p-4 text-center text-emerald-100 text-xs italic rounded-xl border-2 border-dz-gold shadow-lg mt-4 mb-2">
-                    « يسألك الناس عن الساعة قل إنما علمها عند الله وما يدريك لعل الساعة تكون قريبا - الأحزاب »
-                  </div>
+                  {selectedYearObj?.specialties && !selectedSpecialtyId ? (
+                    <div className="flex flex-col gap-6 px-2 mb-8">
+                      <div className="flex items-center gap-4">
+                        <h4 className="text-lg font-black text-dz-dark dark:text-white">اختر الشعبة أو التخصص:</h4>
+                        <div className="flex-1 h-px bg-dz-gold/20"></div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedYearObj.specialties.map(spec => (
+                           <motion.button
+                             key={spec.id}
+                             whileHover={{ scale: 1.02, x: -5 }}
+                             onClick={() => setSelectedSpecialtyId(spec.id)}
+                             className="flex items-center justify-between p-5 bg-white dark:bg-slate-900 border-2 border-dz-gold/30 hover:border-dz-gold rounded-2xl shadow-lg transition-all group gold-3d text-right"
+                           >
+                              <div className="flex items-center gap-4">
+                                 <div className="w-10 h-10 rounded-xl bg-dz-gold/10 flex items-center justify-center text-dz-gold group-hover:bg-dz-gold group-hover:text-white transition-colors">
+                                    <GraduationCap size={20} />
+                                 </div>
+                                 <span className="font-black text-sm text-dz-dark dark:text-white">{spec.label}</span>
+                              </div>
+                              <ChevronLeft size={18} className="text-dz-gold opacity-0 group-hover:opacity-100 transition-opacity" />
+                           </motion.button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="bg-dz-green-dark p-4 text-center text-emerald-100 text-xs italic rounded-xl border-2 border-dz-gold shadow-lg mt-4 mb-2">
+                        « يسألك الناس عن الساعة قل إنما علمها عند الله وما يدريك لعل الساعة تكون قريبا - الأحزاب »
+                      </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-2 px-2 pb-4">
-                    {filteredSubjects.map((subj, index) => (
-                      <motion.div 
-                        key={subj.id} 
-                        whileHover={{ scale: 1.02, y: -2 }} 
-                        onClick={() => setSelectedSubjectId(subj.id)} 
-                        className="flex bg-white dark:bg-slate-900 border-2 border-dz-gold rounded-xl overflow-hidden h-16 group shadow-lg cursor-pointer gold-3d hover:border-dz-green transition-all max-w-[320px] sm:max-w-none w-full my-1 mx-[2px]"
-                      >
-                        <div className="w-12 flex flex-col items-center justify-center border-l dark:border-dz-gold border-dz-gold bg-dz-bg dark:bg-dz-green-dark/30 group-hover:bg-dz-green transition-colors">
-                          <span className="text-dz-green dark:text-dz-gold font-black text-[clamp(9px,2vw,11px)] group-hover:text-white transition-colors">{getSubjectFileCount(subj.id)}</span>
-                        </div>
-                        <div className="flex-1 flex items-center justify-center px-4">
-                          <span className="text-dz-dark dark:text-white font-black text-[clamp(10px,2.5vw,13px)] text-center group-hover:text-dz-green transition-colors leading-tight">{subj.arabicName}</span>
-                        </div>
-                        <div className="w-12 bg-dz-green flex items-center justify-center group-hover:bg-dz-green-dark transition-colors">
-                          <subj.icon size={20} className="text-white group-hover:scale-110 transition-transform" />
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
+                      {selectedYearObj?.specialties && selectedSpecialtyId && (
+                        <button 
+                          onClick={() => setSelectedSpecialtyId(null)}
+                          className="flex items-center gap-2 text-[10px] font-black text-dz-green hover:underline mb-4 px-2"
+                        >
+                          <ChevronRight size={12} />
+                          العودة لاختيار الشعبة
+                        </button>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mt-2 px-2 pb-4">
+                        {filteredSubjects.map((subj, index) => (
+                          <motion.div 
+                            key={subj.id} 
+                            whileHover={{ scale: 1.02, y: -2 }} 
+                            onClick={() => setSelectedSubjectId(subj.id)} 
+                            className="flex bg-white dark:bg-slate-900 border-2 border-dz-gold rounded-xl overflow-hidden h-16 group shadow-lg cursor-pointer gold-3d hover:border-dz-green transition-all max-w-[320px] sm:max-w-none w-full my-1 mx-[2px]"
+                          >
+                            <div className="w-12 flex flex-col items-center justify-center border-l dark:border-dz-gold border-dz-gold bg-dz-bg dark:bg-dz-green-dark/30 group-hover:bg-dz-green transition-colors">
+                              <span className="text-dz-green dark:text-dz-gold font-black text-[clamp(9px,2vw,11px)] group-hover:text-white transition-colors">{getSubjectFileCount(subj.id)}</span>
+                            </div>
+                            <div className="flex-1 flex items-center justify-center px-4">
+                              <span className="text-dz-dark dark:text-white font-black text-[clamp(10px,2.5vw,13px)] text-center group-hover:text-dz-green transition-colors leading-tight">{subj.arabicName}</span>
+                            </div>
+                            <div className="w-12 bg-dz-green flex items-center justify-center group-hover:bg-dz-green-dark transition-colors">
+                              <subj.icon size={20} className="text-white group-hover:scale-110 transition-transform" />
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </>
               ) : (
                 <PdfList 
                   selectedYear={selectedYear}
+                  selectedSpecialtyId={selectedSpecialtyId}
+                  selectedSpecialtyLabel={selectedSpecialtyLabel}
                   selectedSubjectId={selectedSubjectId}
                   subjects={filteredSubjects}
                   remoteFiles={remoteFiles}

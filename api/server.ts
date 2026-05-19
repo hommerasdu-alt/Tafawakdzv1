@@ -97,7 +97,7 @@ try {
 }
 
 // Helper to determine the correct table names dynamically
-let cachedTables: string[] = [];
+const cachedTables: string[] = [];
 async function getActiveTables(force = false) {
   if (cachedTables.length > 0 && !force) return cachedTables;
   
@@ -135,8 +135,76 @@ async function getActiveTables(force = false) {
     return [defaultTable];
   }
 
-  cachedTables = working;
+  cachedTables.length = 0;
+  cachedTables.push(...working);
   return working; 
+}
+
+const SUBJECT_MAPPING: Record<string, string[]> = {
+  'arabic': ['arabe', 'ar', 'اللغة العربية', 'عربية', 'arabic', 'اللغه العربيه', 'لغة عربية', 'لغة العربية'],
+  'french': ['fr', 'french', 'اللغة الفرنسية', 'فرنسية', 'francais', 'français', 'اللغه الفرنسيه'],
+  'english': ['eng', 'en', 'english', 'اللغة الإنجليزية', 'انجليزية', 'anglais', 'اللغه الانجليزيه', 'اللغة الانجليزية'],
+  'islamic': ['islam', 'islamic', 'التربية الإسلامية', 'العلوم الإسلامية', 'اسلامية', 'education islamique', 'تربية اسلامية', 'التربيه الاسلاميه'],
+  'history_geo': ['hist', 'histoire', 'history', 'جغرافيا', 'تاريخ', 'histoire geographie', 'hg', 'التاريخ والجغرافيا', 'تاريخ وجغرافيا'],
+  'civic': ['civic', 'التربية المدنية', 'مدنية', 'education civique', 'التربيه المدنيه', 'تربية مدنية'],
+  'science': ['science', 'sci', 'علوم', 'العلوم الطبيعية', 'snv', 'sciences', 'علوم الطبيعة والحياة', 'علوم الطبيعة و الحياة'],
+  'primary_science': ['science', 'sci', 'التربية العلمية', 'علمية', 'sciences', 'التربية العلمية والتكنولوجية', 'تربية علمية'],
+  'physics': ['physique', 'ph', 'فيزياء', 'الفيزياء', 'physique chimie', 'علوم فيزيائية', 'العلوم الفيزيائية'],
+  'informatics': ['info', 'informatique', 'إعلام آلي', 'اعلام', 'informatique'],
+  'amazigh': ['tamazigh', 'amazigh', 'الأمازيغية', 'امازيغية'],
+  'art': ['dessin', 'art', 'فنية', 'رسم', 'arts'],
+  'music': ['musique', 'music', 'موسيقية', 'موسيقى'],
+  'math': ['math', 'maths', 'الرياضيات', 'رياضيات', 'mathematiques'],
+  'philosophy': ['phil', 'philosophie', 'philosophy', 'فلسفة', 'philo'],
+  'accounting': ['compta', 'comptabilité', 'accounting', 'محاسبة', 'gestion'],
+  'law': ['droit', 'law', 'قانون'],
+  'economy': ['eco', 'economie', 'economy', 'إقتصاد', 'اقتصاد'],
+  'technology': ['tech', 'technologie', 'technology', 'تكنولوجيا', 'techno', 'technologie-st'],
+  'documents': ['docs', 'document', 'documents', 'مستندات', 'مستندات تعليمية']
+};
+
+function getCanonicalMatiere(rawMatiere: string): string {
+  const matiere = rawMatiere.toLowerCase().trim();
+  for (const [key, aliases] of Object.entries(SUBJECT_MAPPING)) {
+    if (key === matiere || aliases.map(a => a.toLowerCase()).includes(matiere)) return key;
+  }
+  return matiere;
+}
+
+function getCanonicalYear(rawYear: string, rawCycle?: string): string {
+  if (!rawYear) return 'unknown';
+  const c = rawYear.toString().toLowerCase().trim();
+  const cy = (rawCycle || '').toLowerCase().trim();
+  
+  if (c.startsWith('61') || c.includes('1ثا') || c.includes('1as') || (cy.includes('secondaire') && (c === '1' || c === '1as'))) return '1as';
+  if (c.startsWith('62') || c.includes('2ثا') || c.includes('2as') || (cy.includes('secondaire') && (c === '2' || c === '2as'))) return '2as';
+  if (c.startsWith('63') || c.includes('3ثا') || c.includes('3as') || (cy.includes('secondaire') && (c === '3' || c === '3as'))) return '3as';
+  
+  if (c.startsWith('41') || c.includes('1مت') || c.includes('1am') || (cy.includes('moyen') && (c === '1' || c === '1am'))) return '1am';
+  if (c.startsWith('42') || c.includes('2مت') || c.includes('2am') || (cy.includes('moyen') && (c === '2' || c === '2am'))) return '2am';
+  if (c.startsWith('43') || c.includes('3مت') || c.includes('3am') || (cy.includes('moyen') && (c === '3' || c === '3am'))) return '3am';
+  if (c.startsWith('44') || c.includes('4مت') || c.includes('4am') || (cy.includes('moyen') && (c === '4' || c === '4am'))) return '4am';
+
+  if (c.startsWith('21') || c.includes('1اب') || c.includes('1ap') || (cy.includes('primaire') && (c === '1' || c === '1ap'))) return '1ap';
+  if (c.startsWith('22') || c.includes('2اب') || c.includes('2ap') || (cy.includes('primaire') && (c === '2' || c === '2ap'))) return '2ap';
+  if (c.startsWith('23') || c.includes('3اب') || c.includes('3ap') || (cy.includes('primaire') && (c === '3' || c === '3ap'))) return '3ap';
+  if (c.startsWith('24') || c.includes('4اب') || c.includes('4ap') || (cy.includes('primaire') && (c === '4' || c === '4ap'))) return '4ap';
+  if (c.startsWith('25') || c.includes('5اب') || c.includes('5ap') || (cy.includes('primaire') && (c === '5' || c === '5ap'))) return '5ap';
+  
+  if (c.includes('1as')) return '1as';
+  if (c.includes('2as')) return '2as';
+  if (c.includes('3as')) return '3as';
+  if (c.includes('1am')) return '1am';
+  if (c.includes('2am')) return '2am';
+  if (c.includes('3am')) return '3am';
+  if (c.includes('4am')) return '4am';
+  if (c.includes('1ap')) return '1ap';
+  if (c.includes('2ap')) return '2ap';
+  if (c.includes('3ap')) return '3ap';
+  if (c.includes('4ap')) return '4ap';
+  if (c.includes('5ap')) return '5ap';
+  
+  return c;
 }
 
 // Helper to extract trimester label from row data
@@ -437,8 +505,11 @@ function extractTrimestreLabel(row: any) {
       const statsMap = data.reduce((acc: any, row: any) => {
         // Normalize casing to match site_data.json
         let cycle = (row.cycle || row.Cycle || 'unknown').toLowerCase();
-        let annee = (row.annee || row.Année || row['Année'] || 'unknown').toLowerCase();
-        let matiere = (row.matiere || row.Matière || row.Matiere || row.filliere || 'unknown').toLowerCase();
+        let rawAnnee = (row.annee || row.Année || row['Année'] || 'unknown');
+        let annee = getCanonicalYear(rawAnnee, cycle);
+        let rawMatiere = row.matiere || row.Matière || row.Matiere || 'unknown';
+        let matiere = getCanonicalMatiere(rawMatiere);
+        let rawFilliere = row.filliere || row.Filliere || row.filiere || '';
         
         // Normalize common arabic cycle names to technical IDs
         if (cycle.includes('ابتدائ') || cycle.includes('primary')) cycle = 'primary';
@@ -447,9 +518,9 @@ function extractTrimestreLabel(row: any) {
 
         const trimestre = extractTrimestreLabel(row);
         
-        const key = `${cycle}|${annee}|${matiere}|${trimestre}`;
+        const key = `${cycle}|${annee}|${matiere}|${trimestre}|${rawFilliere}`;
         if (!acc[key]) {
-          acc[key] = { cycle, annee, matiere, trimestre, count: 0 };
+          acc[key] = { cycle, annee, matiere, trimestre, filiere: rawFilliere, count: 0 };
         }
         acc[key].count++;
         return acc;
@@ -540,34 +611,12 @@ function extractTrimestreLabel(row: any) {
   // API Routes
   app.get('/api/sujets/:matiere', async (req, res) => {
     const { matiere } = req.params;
+    const { filiere } = req.query;
     if (!matiere) {
       return res.status(400).json({ error: "Le paramètre 'matiere' est manquant." });
     }
 
-    const subjectMapping: Record<string, string[]> = {
-      'arabic': ['arabe', 'ar', 'اللغة العربية', 'عربية', 'arabic', 'اللغه العربيه', 'لغة عربية', 'لغة العربية'],
-      'french': ['fr', 'french', 'اللغة الفرنسية', 'فرنسية', 'francais', 'français', 'اللغه الفرنسيه'],
-      'english': ['eng', 'en', 'english', 'اللغة الإنجليزية', 'انجليزية', 'anglais', 'اللغه الانجليزيه', 'اللغة الانجليزية'],
-      'islamic': ['islam', 'islamic', 'التربية الإسلامية', 'العلوم الإسلامية', 'اسلامية', 'education islamique', 'تربية اسلامية', 'التربيه الاسلاميه'],
-      'history_geo': ['hist', 'histoire', 'history', 'جغرافيا', 'تاريخ', 'histoire geographie', 'hg', 'التاريخ والجغرافيا', 'تاريخ وجغرافيا'],
-      'civic': ['civic', 'hist', 'التربية المدنية', 'مدنية', 'education civique', 'التربيه المدنيه', 'تربية مدنية'],
-      'science': ['science', 'sci', 'علوم', 'العلوم الطبيعية', 'snv', 'sciences', 'علوم الطبيعة والحياة', 'علوم الطبيعة و الحياة'],
-      'primary_science': ['science', 'sci', 'التربية العلمية', 'علمية', 'sciences', 'التربية العلمية والتكنولوجية', 'تربية علمية'],
-      'physics': ['physique', 'ph', 'فيزياء', 'الفيزياء', 'physique chimie', 'علوم فيزيائية', 'العلوم الفيزيائية'],
-      'informatics': ['info', 'informatique', 'إعلام آلي', 'اعلام', 'informatique'],
-      'amazigh': ['tamazigh', 'amazigh', 'الأمازيغية', 'امازيغية'],
-      'art': ['dessin', 'art', 'فنية', 'رسم', 'arts'],
-      'music': ['musique', 'music', 'موسيقية', 'موسيقى'],
-      'math': ['math', 'maths', 'الرياضيات', 'رياضيات', 'mathematiques'],
-      'philosophy': ['phil', 'philosophie', 'philosophy', 'فلسفة', 'philo'],
-      'accounting': ['compta', 'comptabilité', 'accounting', 'محاسبة', 'gestion'],
-      'law': ['droit', 'law', 'قانون'],
-      'economy': ['eco', 'economie', 'economy', 'إقتصاد', 'اقتصاد'],
-      'technology': ['tech', 'technologie', 'technology', 'تكنولوجيا', 'techno', 'technologie-st'],
-      'documents': ['docs', 'document', 'documents', 'مستندات', 'مستندات تعليمية']
-    };
-
-    const targetLabels = (subjectMapping[matiere] || [matiere]).map(t => t.toLowerCase());
+    const targetLabels = (SUBJECT_MAPPING[matiere] || [matiere]).map(t => t.toLowerCase());
 
     // Try Supabase first
     if (supabase) {
@@ -616,6 +665,7 @@ function extractTrimestreLabel(row: any) {
 
               const rowAnnee = (row.annee || row.Année || row.code_niveau || '').toString().toLowerCase();
               const rowCycle = (row.cycle || row.Cycle || '').toString().toLowerCase();
+              const rowFilliere = (row.filliere || row.Filliere || row.filiere || '').toString().toLowerCase();
 
               const matchSubject = rowMatiere === matiere.toLowerCase() || 
                                   targetLabels.includes(rowMatiere) ||
@@ -623,7 +673,26 @@ function extractTrimestreLabel(row: any) {
               
               const matchPath = targetLabels.some(label => rowPath.includes(`/${label}`) || rowPath.includes(`/${label}/`));
               
-              return matchSubject || matchPath;
+              let matchFiliere = !filiere;
+              if (filiere) {
+                const fQuery = (filiere as string).toLowerCase();
+                const rowF = rowFilliere.toLowerCase();
+                const rowP = rowPath.toLowerCase();
+                
+                if (fQuery.includes('scientific')) {
+                  matchFiliere = rowF.includes('scientific') || rowF.includes('se') || rowF.includes('m') || rowF.includes('tm') || 
+                                rowF.includes('علوم') || rowF.includes('رياضيات') || rowF.includes('تقني') ||
+                                rowP.includes('se') || rowP.includes('tm') || rowP.includes('maths');
+                } else if (fQuery.includes('literary')) {
+                  matchFiliere = rowF.includes('literary') || rowF.includes('lp') || rowF.includes('le') || 
+                                rowF.includes('آداب') || rowF.includes('لغات') ||
+                                rowP.includes('lp') || rowP.includes('le') || rowP.includes('lettres');
+                } else {
+                  matchFiliere = rowF.includes(fQuery) || rowP.includes(fQuery);
+                }
+              }
+              
+              return (matchSubject || matchPath) && matchFiliere;
             } catch (e) {
               return false;
             }
@@ -633,16 +702,20 @@ function extractTrimestreLabel(row: any) {
             console.log(`✨ Found ${filtered.length} matches in Supabase.`);
             
             const mapped = filtered.map((row: any) => {
+              const cycle = (row.cycle || '').toLowerCase();
+              const rawAnnee = row.annee || row.code_niveau || row.cycle || '';
+              const rawMatiere = row.matiere || row.filliere || '';
+              
               return {
-                code_niveau: row.annee || row.code_niveau || row.cycle || '',
-                matiere: row.matiere || row.filliere || '',
+                code_niveau: getCanonicalYear(rawAnnee, cycle),
+                matiere: getCanonicalMatiere(rawMatiere),
                 reference_pdf: row.nom_pdf || row.reference_pdf || row.Trimesttre || row.trimestre || '',
                 lien_direct_drive: row.lien_direct || row.lien_direct_drive || '',
                 chemin_complet: row.chemin_complet || '',
                 trimestre: extractTrimestreLabel(row),
                 filliere: row.filliere || '',
-                annee: row.annee || '',
-                cycle: row.cycle || ''
+                annee: getCanonicalYear(rawAnnee, cycle),
+                cycle: cycle
               };
             });
             return res.json(mapped);
@@ -781,15 +854,19 @@ function extractTrimestreLabel(row: any) {
           }).slice(0, 150);
 
           const mapped = filtered.map((row: any) => {
+            const cycle = (row.cycle || '').toLowerCase();
+            const rawAnnee = row.annee || row.code_niveau || row.cycle || '';
+            const rawMatiere = row.matiere || row.filliere || '';
+            
             return {
-              code_niveau: row.annee || row.cycle || '',
-              matiere: row.matiere || row.filliere || '',
+              code_niveau: getCanonicalYear(rawAnnee, cycle),
+              matiere: getCanonicalMatiere(rawMatiere),
               reference_pdf: row.nom_pdf || row.Trimesttre || row.trimestre || '',
               lien_direct_drive: row.lien_direct || row.lien_direct_drive || '',
               chemin_complet: row.chemin_complet || '',
               trimestre: extractTrimestreLabel(row),
-              cycle: row.cycle || '',
-              annee: row.annee || '',
+              cycle: cycle,
+              annee: getCanonicalYear(rawAnnee, cycle),
               filliere: row.filliere || ''
             };
           });
@@ -805,13 +882,19 @@ function extractTrimestreLabel(row: any) {
       return text.includes(query);
     }).slice(0, 30);
 
-    const mappedCsv = csvResults.map(row => ({
-      code_niveau: row.Cycle || row.Cycle || row.cycle || row.Année || row.annee || '',
-      matiere: row.Matière || row.matiere || '',
-      reference_pdf: row['Nom du fichier PDF'] || row.reference_pdf || '',
-      lien_direct_drive: row['Lien direct'] || row.lien_direct_drive || '',
-      chemin_complet: row['Chemin complet'] || row.chemin_complet || ''
-    }));
+    const mappedCsv = csvResults.map(row => {
+      const cycle = (row['Cycle'] || row.cycle || '').toLowerCase();
+      const rawAnnee = row['Année'] || row.annee || cycle || '';
+      const rawMatiere = row['Matière'] || row.matiere || '';
+      
+      return {
+        code_niveau: getCanonicalYear(rawAnnee, cycle),
+        matiere: getCanonicalMatiere(rawMatiere),
+        reference_pdf: row['Nom du fichier PDF'] || row.reference_pdf || '',
+        lien_direct_drive: row['Lien direct'] || row.lien_direct_drive || '',
+        chemin_complet: row['Chemin complet'] || row.chemin_complet || ''
+      };
+    });
 
     res.json(mappedCsv);
   });

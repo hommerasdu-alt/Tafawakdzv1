@@ -61,7 +61,7 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
     setSuccess(false);
 
     try {
-      let workbook;
+      let workbook: XLSX.WorkBook;
       const arrayBuffer = await file.arrayBuffer();
       
       if (file.name.toLowerCase().endsWith('.csv')) {
@@ -87,77 +87,86 @@ export default function TeacherSpace({ isOpen, onClose }: { isOpen: boolean; onC
         workbook = XLSX.read(arrayBuffer);
       }
 
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      
-      // Get all rows as dynamic arrays
-      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" }) as any[][];
+      let allFormattedData: StudentGrade[] = [];
+      let globalIdx = 0;
 
-      if (rows.length <= 7) {
-        throw new Error('الملف لا يحتوي على بيانات كافية (يجب أن يتجاوز 7 أسطر لتروية المؤسسة)');
-      }
+      // Process ALL sheets in the workbook
+      for (const sheetName of workbook.SheetNames) {
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // Get all rows as dynamic arrays
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" }) as any[][];
 
-      // Skip exactly 7 lines as requested (Metadata). Start processing from line 8.
-      // Often line 8/9 are headers, data usually starts around line 10 in these Algerian templates.
-      const dataRows = rows.slice(7); 
-      
-      // Dynamic column identification
-      let nomIdx = -1;
-      let prenomIdx = -1;
-      let gradeIdx = -1;
+        if (rows.length <= 7) continue; // Skip empty or too short sheets
 
-      // Find the header row (looking for "nom", "prenom", "matricule", or "/" in line 8 or 9)
-      const headerCandidates = dataRows.slice(0, 3);
-      let skipRows = 0;
+        // Skip exactly 7 lines as requested (Metadata). Start processing from line 8.
+        const dataRows = rows.slice(7); 
+        
+        // Dynamic column identification
+        let nomIdx = -1;
+        let prenomIdx = -1;
+        let gradeIdx = -1;
 
-      for (let r = 0; r < headerCandidates.length; r++) {
-        const row = headerCandidates[r];
-        for (let c = 0; c < row.length; c++) {
-          const val = String(row[c]).toLowerCase();
-          if (val.includes('nom') || val.includes('اللقب')) nomIdx = c;
-          if (val.includes('prenom') || val.includes('الاسم')) prenomIdx = c;
-          if (val.includes('09') || val.includes('المعدل') || val.includes('moyenne') || val.includes('/20')) gradeIdx = c;
-        }
-        if (nomIdx !== -1 || gradeIdx !== -1) {
-          skipRows = r + 1; // Skip the header row(s) too
-          break;
-        }
-      }
+        // Find the header row (looking for "nom", "prenom", "matricule", or "/" in line 8 or 9)
+        const headerCandidates = dataRows.slice(0, 5);
+        let skipRows = 0;
 
-      // Fallbacks if detection failed on header
-      if (nomIdx === -1) nomIdx = 1; // Algerian templates often have Nom at Col B
-      if (prenomIdx === -1) prenomIdx = 2; // Prenom at Col C
-      if (gradeIdx === -1) gradeIdx = 7; // Average often at Col H (Idx 7)
-
-      const finalRows = dataRows.slice(skipRows);
-
-      const formattedData: StudentGrade[] = finalRows
-        .filter(row => row.length > 0 && row[nomIdx] !== undefined && String(row[nomIdx]).trim() !== "")
-        .map((row, idx) => {
-          // Combine Nom and Prenom if separate
-          const lastName = row[nomIdx] ? String(row[nomIdx]).trim() : '';
-          const firstName = prenomIdx !== -1 && row[prenomIdx] ? String(row[prenomIdx]).trim() : '';
-          const fullName = firstName ? `${lastName} ${firstName}` : lastName;
-
-          // Find grade by searching for the numeric value in the detected grade column
-          let grade = 0;
-          if (gradeIdx !== -1 && row[gradeIdx] !== undefined) {
-            const parsed = parseFloat(String(row[gradeIdx]).replace(',', '.'));
-            grade = !isNaN(parsed) ? parsed : 0;
+        for (let r = 0; r < headerCandidates.length; r++) {
+          const row = headerCandidates[r];
+          for (let c = 0; c < row.length; c++) {
+            const val = String(row[c] || '').toLowerCase();
+            if (val.includes('nom') || val.includes('اللقب')) nomIdx = c;
+            if (val.includes('prenom') || val.includes('الاسم')) prenomIdx = c;
+            if (val.includes('09') || val.includes('المعدل') || val.includes('moyenne') || val.includes('/20')) gradeIdx = c;
           }
+          if (nomIdx !== -1 || gradeIdx !== -1) {
+            skipRows = r + 1; 
+            break;
+          }
+        }
 
-          const appraisals = getAppraisal(grade);
-          return {
-            id: (idx + 1).toString(),
-            name: fullName || 'غير معروف',
-            grade: grade,
-            appreciation: appraisals.appreciation,
-            advice: appraisals.advice,
-            note: '' 
-          };
-        });
+        // Fallbacks if detection failed on header
+        if (nomIdx === -1) nomIdx = 1; 
+        if (prenomIdx === -1) prenomIdx = 2; 
+        if (gradeIdx === -1) gradeIdx = 7; 
 
-      setExtractedData(formattedData);
+        const finalRows = dataRows.slice(skipRows);
+
+        const sheetData: StudentGrade[] = finalRows
+          .filter(row => row.length > 0 && row[nomIdx] !== undefined && String(row[nomIdx]).trim() !== "" && !String(row[nomIdx]).toLowerCase().includes('matricule'))
+          .map((row) => {
+            globalIdx++;
+            // Combine Nom and Prenom if separate
+            const lastName = row[nomIdx] ? String(row[nomIdx]).trim() : '';
+            const firstName = prenomIdx !== -1 && row[prenomIdx] ? String(row[prenomIdx]).trim() : '';
+            const fullName = firstName ? `${lastName} ${firstName}` : lastName;
+
+            // Find grade
+            let grade = 0;
+            if (gradeIdx !== -1 && row[gradeIdx] !== undefined) {
+              const parsed = parseFloat(String(row[gradeIdx]).replace(',', '.'));
+              grade = !isNaN(parsed) ? parsed : 0;
+            }
+
+            const appraisals = getAppraisal(grade);
+            return {
+              id: globalIdx.toString(),
+              name: fullName || 'غير معروف',
+              grade: grade,
+              appreciation: appraisals.appreciation,
+              advice: appraisals.advice,
+              note: `Sheet: ${sheetName}` 
+            };
+          });
+        
+        allFormattedData = [...allFormattedData, ...sheetData];
+      }
+
+      if (allFormattedData.length === 0) {
+        throw new Error('لم يتم العثور على بيانات صالحة في أي ورقة من أوراق الملف');
+      }
+
+      setExtractedData(allFormattedData);
       setSuccess(true);
     } catch (err: any) {
       setError(err.message || 'حدث خطأ أثناء معالجة الملف');
